@@ -1,19 +1,16 @@
 #!/usr/bin/python2
 
-import math
 import random
 import numpy as np
-import time
 import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
 from matplotlib import cm
-from matplotlib.ticker import LinearLocator, FormatStrFormatter
 from matplotlib import animation
 
 
 class Grid:
     Lx = 2.
-    Ly = 2.
+    Ly = 3.
 
     def __init__(self, _nx, _ny):
         self.nx = _nx
@@ -141,7 +138,7 @@ class Simulation:
     dt = 0.01
 
     # ---------------------------------METHODS-----------------------------------
-    def __init__(self, _nx, _ny, bnd_field):
+    def __init__(self, _nx, _ny):
         self.grid = Grid(_nx, _ny)
         self.field = np.zeros([_nx, _ny])
         self.size = _nx * _ny
@@ -166,15 +163,23 @@ class Simulation:
             self.Mat[j + (_nx-1) * _ny] = np.zeros([self.size])
             self.Mat[j + 0 * _ny][j + 0 * _ny] = 1.
             self.Mat[j + (_nx-1) * _ny][j + (_nx-1) * _ny] = 1.
-            self.rhs[0][j] = 0.#bnd_field[0][j]
-            self.rhs[self.grid.nx - 1][j] = 0.#bnd_field[self.grid.nx - 1][j]
+            self.rhs[0][j] = 0.
+            self.rhs[self.grid.nx - 1][j] = 0.
+            # self.Mat[j + 0 * _ny][j + 0 * _ny] = 0.
+            # self.Mat[j + (_nx - 1) * _ny][j + (_nx - 1) * _ny] = 0.
+            # self.rhs[0][j] = bnd_field[0][j]
+            # self.rhs[self.grid.nx - 1][j] = bnd_field[self.grid.nx - 1][j]
         for i in range(self.grid.nx):
             self.Mat[0     + i * _ny] = np.zeros([self.size])
             self.Mat[_ny-1 + i * _ny] = np.zeros([self.size])
             self.Mat[0     + i * _ny][0     + i * _ny] = 1.
             self.Mat[_ny-1 + i * _ny][_ny-1 + i * _ny] = 1.
-            self.rhs[i][0] = 0.#bnd_field[i][0]
-            self.rhs[i][self.grid.ny - 1] = 0.#bnd_field[i][self.grid.ny - 1]
+            self.rhs[i][0] = 0.
+            self.rhs[i][self.grid.ny - 1] = 0.
+            # self.Mat[0 + i * _ny][0 + i * _ny] = 0.
+            # self.Mat[_ny - 1 + i * _ny][_ny - 1 + i * _ny] = 0.
+            # self.rhs[i][0] = bnd_field[i][0]
+            # self.rhs[i][self.grid.ny - 1] = bnd_field[i][self.grid.ny - 1]
         self.field = np.zeros([_nx, _ny])
 
     def GetGrid(self):
@@ -215,19 +220,19 @@ class Simulation:
 
 # Implements a linear Kalman filter.
 class KalmanFilterLinear:
-    def __init__(self, _Phi, _B, _M, _X, _S, _Q, _R, _nx, _ny, _bnd_field):
-        self.Phi = _Phi  # State transition matrix.
-        self.B = _B      # Control matrix.
-        self.M = _M      # Observation matrix.
-        self.X = _X      # Initial state estimate.
-        self.S = _S      # Initial covariance estimate.
-        self.Q = _Q      # Estimated error in process.
-        self.R = _R      # Estimated error in measurements.
-        self.size = self.S.shape[0]
+    def __init__(self, _M, _X, _S, _Q, _R, _nx, _ny):
+        self.size = _S.shape[0]
         self.fieldsize = [_nx, _ny]
         self.Id = np.eye(self.size)
-        self.sim = Simulation(_nx, _ny, _bnd_field)
+        self.sim = Simulation(_nx, _ny)
         self.sim.field = np.reshape(X, self.fieldsize)
+
+        self.Phi = self.sim.Mat  # State transition matrix.
+        self.M = _M              # Observation matrix.
+        self.X = _X              # Initial state estimate.
+        self.S = _S              # Initial covariance estimate.
+        self.Q = _Q              # Estimated error in process.
+        self.R = _R              # Estimated error in measurements.
 
     def GetCurrentState(self):
         return self.X
@@ -294,7 +299,7 @@ def run(data):
     return surf,
 # ===========================REAL PROGRAM START================================
 
-# Let's make a proper simulation.
+# Size of the problem
 nx, ny = 10, 20
 
 # ------------------------ Initialize arrays ----------------------------
@@ -351,10 +356,8 @@ plt.show()
 
 # ------------------------ Compute simulation without Kalman ----------------------------
 
-# Bad boundary conditions
-T_bnd = reality.GetTWithNoise()
-simulation = Simulation(nx, ny, T_bnd)
-# Bad initial solution
+simulation = Simulation(nx, ny)
+# Bad initial solution and boundary condition
 T_bnd = reality.GetTWithNoise()
 simulation.field = T_bnd
 
@@ -373,18 +376,15 @@ plt.show()
 # ------------------------ Compute simulation with Kalman ----------------------------
 
 M = np.eye(simulation.size)  # Observation matrix.
-B = np.eye(simulation.size)  # Control matrix.
 S = np.eye(simulation.size)        # Initial covariance estimate.
 R = np.eye(simulation.size) * 0.2  # Estimated error in measurements.
 Q = np.eye(simulation.size) * 0    # Estimated error in process.
 X = np.zeros([simulation.size])
 Y = np.zeros([simulation.size])
 
-# Bad initial condition
+# Bad initial condition and boundary condition
 X = np.reshape(reality.GetTWithNoise(), [simulation.size])
-# Bad boundary conditions
-Y = np.reshape(reality.GetTWithNoise(), [simulation.size])
-kf = KalmanFilterLinear(simulation.Mat, B, M, X, S, Q, R, nx, ny, Y)
+kf = KalmanFilterLinear(M, X, S, Q, R, nx, ny)
 
 print "Simulation avec Kalman..."
 fig = plt.figure()
