@@ -10,6 +10,7 @@ from matplotlib import cm
 from matplotlib.ticker import LinearLocator, FormatStrFormatter
 from matplotlib import animation
 
+
 class Grid:
     Lx = 2.
     Ly = 2.
@@ -195,9 +196,26 @@ class Simulation:
 
         return _conv
 
+    def data_gen(self):
+        i = 0
+        conv = 1.
+        err = 999.
+        while conv > 1e-3:
+            i += 1
+            conv = self.Step()
+            T_sim = self.GetT()
+            H1 = T_ref - T_sim
+            H1x = mesh.derx(H1)
+            H1y = mesh.dery(H1)
+            err = np.sqrt(np.sum(np.square(H1)) + np.sum(np.square(H1x)) + np.sum(np.square(H1y))) / H1_ref
+            yield T_sim, i, err, conv
+
+        # print i, conv
+        print "Norme H1 de la simulation", err
+
 # Implements a linear Kalman filter.
 class KalmanFilterLinear:
-    def __init__(self, _Phi, _B, _M, _X, _S, _Q, _R):
+    def __init__(self, _Phi, _B, _M, _X, _S, _Q, _R, _nx, _ny, _bnd_field):
         self.Phi = _Phi  # State transition matrix.
         self.B = _B      # Control matrix.
         self.M = _M      # Observation matrix.
@@ -205,15 +223,22 @@ class KalmanFilterLinear:
         self.S = _S      # Initial covariance estimate.
         self.Q = _Q      # Estimated error in process.
         self.R = _R      # Estimated error in measurements.
-        self.Id = np.eye(self.S.shape[0])
+        self.size = self.S.shape[0]
+        self.fieldsize = [_nx, _ny]
+        self.Id = np.eye(self.size)
+        self.sim = Simulation(_nx, _ny, _bnd_field)
+        self.sim.field = np.reshape(X, self.fieldsize)
 
     def GetCurrentState(self):
         return self.X
 
-    def Step(self, _control_vector, _Y):
+    def Step(self, _Y):
 
         # -------------------------Prediction step-----------------------------
-        X_new = self.Phi.dot(self.X) + self.B.dot(_control_vector)
+        # Simulation
+        conv = self.sim.Step()
+        X_new = np.reshape(self.sim.GetT(), self.size)
+        # predict covariance estimate
         self.S = self.Phi.dot(self.S).dot(np.transpose(self.Phi)) + self.Q
 
         # ------------------------Observation step-----------------------------
@@ -221,274 +246,41 @@ class KalmanFilterLinear:
         innovation = _Y - self.M.dot(X_new)
 
         # ---------------------------Update step-------------------------------
+        # compute Kalman filter
         K = self.S.dot(np.transpose(self.M)).dot(np.linalg.inv(innovation_covariance))
+        # apply Kalman filter
         X_new = X_new + K.dot(innovation)
-        conv = np.sqrt(np.sum(np.square(self.X - X_new)))
-        self.X = X_new
         self.S = (self.Id - K.dot(self.M)).dot(self.S)
 
+        # compute L2 convergence to stationary solution
+        conv = np.sqrt(np.sum(np.square(self.X - X_new)))
+
+        # save fields
+        self.X = X_new
+        self.sim.field = np.reshape(self.X, self.fieldsize)
         return conv
 
-
-# ===========================REAL PROGRAM START================================
-
-# Let's make a proper simulation.
-nx, ny = 10, 20
-
-# Initialize arrays
-T_ref = np.zeros([nx, ny])
-T_mes = np.zeros([nx, ny])
-T_bnd = np.zeros([nx, ny])
-T_sim = np.zeros([nx, ny])
-T_kal = np.zeros([nx, ny])
-
-H1 = np.zeros([nx, ny])
-H1x = np.zeros([nx, ny])
-H1y = np.zeros([nx, ny])
-
-reality = Reality(nx, ny)
-reality.Compute()
-mesh = reality.GetGrid()
-T_ref = reality.GetT()
-T_mes = reality.GetTWithNoise()
+    def data_gen(self):
+        i = 0
+        conv = 1.
+        err = 999.
+        while conv > 1e-2:
+            i += 1
+            Y = np.reshape(reality.GetTWithNoise(), [simulation.size])
+            conv = self.Step(Y)
+            X = self.GetCurrentState()
+            T_kal = np.reshape(X, [nx, ny])
+            H1 = T_ref - T_kal
+            H1x = mesh.derx(H1)
+            H1y = mesh.dery(H1)
+            err = np.sqrt(np.sum(np.square(H1)) + np.sum(np.square(H1x)) + np.sum(np.square(H1y))) / H1_ref
+            # if divmod(i, 10):
+            yield T_kal, i, err, conv
+        # print i, conv, err
+        print "Norme H1 du Kalman", err
 
 
-fig = plt.figure()
-ax = fig.gca(projection='3d')
-ax.set_xlim(-1, 1)
-ax.set_ylim(-1, 1)
-ax.set_zlim(-1, 1)
-surf = ax.plot_surface(mesh.coordx, mesh.coordy, T_ref, rstride=1, cstride=1, cmap=cm.coolwarm,
-                       linewidth=0, antialiased=False)
-fig.colorbar(surf, shrink=0.5, aspect=5)
-plt.show()
-
-fig = plt.figure()
-ax = fig.gca(projection='3d')
-ax.set_xlim(-1, 1)
-ax.set_ylim(-1, 1)
-ax.set_zlim(-1, 1)
-surf = ax.plot_surface(mesh.coordx, mesh.coordy, T_mes, rstride=1, cstride=1, cmap=cm.coolwarm,
-                       linewidth=0, antialiased=False)
-fig.colorbar(surf, shrink=0.5, aspect=5)
-plt.show()
-
-# Bad boundary conditions
-T_bnd = reality.GetTWithNoise()
-simulation = Simulation(nx, ny, T_bnd)
-# Bad initial solution
-T_bnd = reality.GetTWithNoise()
-simulation.field = T_bnd
-
-T_sim = simulation.GetT()
-conv = 1.
-i=0
-
-H1 = T_ref
-H1x = mesh.derx(H1)
-H1y = mesh.dery(H1)
-H1_ref = np.sqrt(np.sum(np.square(H1)) + np.sum(np.square(H1x)) + np.sum(np.square(H1y)))
-H1 = T_ref - T_mes
-H1x = mesh.derx(H1)
-H1y = mesh.dery(H1)
-err = np.sqrt(np.sum(np.square(H1)) + np.sum(np.square(H1x)) + np.sum(np.square(H1y))) / H1_ref
-print "Norme H1 de la mesure", err
-
-M = np.eye(simulation.size)  # Observation matrix.
-B = np.eye(simulation.size)  # Control matrix.
-S = np.eye(simulation.size)        # Initial covariance estimate.
-R = np.eye(simulation.size) * 0.2  # Estimated error in measurements.
-Q = np.eye(simulation.size) * 0    # Estimated error in process.
-X = np.zeros([simulation.size])
-rhs2 = np.zeros([simulation.size])
-Y = np.zeros([simulation.size])
-
-# T_sim is our guess of the initial state.
-X = np.reshape(T_sim, [simulation.size])
-rhs2 = np.reshape(simulation.rhs, [simulation.size])
-Y = np.reshape(reality.GetTWithNoise(), [simulation.size])
-kf = KalmanFilterLinear(simulation.Mat, B, M, X, S, Q, R)
-
-# print "Simulation en cours sans Kalman..."
-# while conv > 1e-6:
-#     i+=1
-#     conv = simulation.Step()
-#     T_sim = simulation.GetT()
-#     H1 = T_ref - T_sim
-#     H1x = mesh.derx(H1)
-#     H1y = mesh.dery(H1)
-#     err = np.sqrt(np.sum(np.square(H1))+ np.sum(np.square(H1x)) +np.sum(np.square(H1y)))/H1_ref
-# # print i, conv
-# print "Norme H1 de la simulation", err
-
-# fig = plt.figure()
-# ax = fig.gca(projection='3d')
-# ax.set_xlim(-1, 1)
-# ax.set_ylim(-1, 1)
-# ax.set_zlim(-1, 1)
-# surf = ax.plot_surface(mesh.coordx, mesh.coordy, T_sim, rstride=1, cstride=1, cmap=cm.coolwarm,
-#                        linewidth=0, antialiased=False)
-# fig.colorbar(surf, shrink=0.5, aspect=5)
-# plt.show()
-
-# print "Simulation en cours avec Kalman..."
-# i_ref = i+1
-# i = 0
-# conv=1.
-# # for i in range(i_ref):
-# while conv > 1e-2:
-#     i+=1
-#     Y = np.reshape(reality.GetTWithNoise(), [simulation.size])#*0.
-#     conv = kf.Step(rhs2, Y)
-#     X = kf.GetCurrentState()
-#     T_kal = np.reshape(X, [nx, ny])
-#     H1 = T_ref - T_kal
-#     H1x = mesh.derx(H1)
-#     H1y = mesh.dery(H1)
-#     err = np.sqrt(np.sum(np.square(H1))+ np.sum(np.square(H1x)) +np.sum(np.square(H1y)))/H1_ref
-# # print i, conv, err
-# print "Norme H1 du Kalman", err, i, conv
-#
-#
-# fig = plt.figure()
-# ax = fig.gca(projection='3d')
-# ax.set_xlim(-1, 1)
-# ax.set_ylim(-1, 1)
-# ax.set_zlim(-1, 1)
-# surf = ax.plot_surface(mesh.coordx, mesh.coordy, T_kal, rstride=1, cstride=1, cmap=cm.coolwarm,
-#                        linewidth=0, antialiased=False)
-# fig.colorbar(surf, shrink=0.5, aspect=5)
-# plt.show()
-
-
-
-# # Error in modelisation
-# Error = 0.01 * dt * np.array([[1, 0, 0, 0],
-#                               [0, 1, 0, 0],
-#                               [0, 0, 1, 0],
-#                               [0, 0, 0, 1]])
-# Phi_sim = Phi_real + Error
-#
-# # Let's make a erroneous cannon simulation.
-# simulation = Simulation(Phi_sim)
-#
-# # Observation matrix is the identity matrix, since we can get direct
-# # measurements of all values in our example.
-# M = np.array([[1, 0, 0, 0],
-#               [0, 0, 1, 0]])  # Observation matrix.
-# B = np.array([[0, 0, 0, 0],
-#               [0, 0, 0, 0],
-#               [0, 0, 1, 0],
-#               [0, 0, 0, 1]])  # Control matrix.
-# S = np.eye(4)        # Initial covariance estimate.
-# R = np.eye(2) * 0.2  # Estimated error in measurements.
-# Q = np.eye(4) * 0    # Estimated error in process.
-#
-# # This is our guess of the initial state.
-# X = np.array([[simulation.GetX()],
-#               [simulation.GetXVelocity()],
-#               [simulation.GetY()],
-#               [simulation.GetYVelocity()]])
-#
-# kf = KalmanFilterLinear(Phi_sim, B, M, X, S, Q, R)
-#
-# # Iterate through the simulation.
-# for i in range(iterations):
-#     # print(i, reality.GetX(), reality.GetY())
-#     # if not initial value
-#     if i > 0:
-#         source_term = np.array([[0],
-#                                 [0],
-#                                 [-0.5 * 9.81 * dt * dt],
-#                                 [-9.81 * dt]])
-#
-#         # Iterate the cannon simulation to the next time step.
-#         reality.Step(source_term)
-#
-#         # Iterate the cannon simulation to the next time step.
-#         simulation.Step(source_term)
-#
-#         # Operate measurement
-#         Y = np.array([[reality.GetXWithNoise()],
-#                       [reality.GetYWithNoise()]])
-#
-#         # Apply Kalman filter
-#         kf.Step(source_term, Y)
-#
-#     # Store obtained values for plot
-#     X = kf.GetCurrentState()
-#
-#     x_ref.append(reality.GetX())
-#     y_ref.append(reality.GetY())
-#     x_mes.append(reality.GetXWithNoise())
-#     y_mes.append(reality.GetYWithNoise())
-#     x_sim.append(simulation.GetX())
-#     y_sim.append(simulation.GetY())
-#     x_kal.append(X[0][0])
-#     y_kal.append(X[2][0])
-#
-#
-# err = 0
-# for i in range(iterations):
-#     err += (x_ref[i] - x_mes[i])**2
-#     err += (y_ref[i] - y_mes[i])**2
-# print "error in measurement", np.sqrt(err)
-# err = 0
-# for i in range(iterations):
-#     err += (x_ref[i] - x_sim[i])**2
-#     err += (y_ref[i] - y_sim[i])**2
-# print "error in simulation", np.sqrt(err)
-# err = 0
-# for i in range(iterations):
-#     err += (x_ref[i] - x_kal[i])**2
-#     err += (y_ref[i] - y_kal[i])**2
-# print "error final", np.sqrt(err)
-#
-# # Plot all the results we got.
-# # plt.ion()
-# plt.xlabel('X position')
-# plt.ylabel('Y position')
-# plt.title('Measurement of a Cannonball in Flight')
-# plt.plot(x_ref, y_ref, '-', x_sim, y_sim, '-', x_mes, y_mes, ':', x_kal, y_kal, '--')
-# plt.legend(('reality', 'simulated', 'measured', 'kalman'))
-# plt.show()
-
-
-def data_gen_sim():
-    i = 0
-    conv = 1.
-    while conv > 1e-3:
-        i += 1
-        conv = simulation.Step()
-        T_sim = simulation.GetT()
-        H1 = T_ref - T_sim
-        H1x = mesh.derx(H1)
-        H1y = mesh.dery(H1)
-        err = np.sqrt(np.sum(np.square(H1))+ np.sum(np.square(H1x)) +np.sum(np.square(H1y)))/H1_ref
-        yield T_sim, i, err, conv
-
-    # print i, conv
-    print "Norme H1 de la simulation", err
-
-
-def data_gen_kal():
-    i = 0
-    conv = 1.
-    while conv > 1e-2:
-        i += 1
-        Y = np.reshape(reality.GetTWithNoise(), [simulation.size])
-        conv = kf.Step(rhs2, Y)
-        X = kf.GetCurrentState()
-        T_kal = np.reshape(X, [nx, ny])
-        H1 = T_ref - T_kal
-        H1x = mesh.derx(H1)
-        H1y = mesh.dery(H1)
-        err = np.sqrt(np.sum(np.square(H1))+ np.sum(np.square(H1x)) +np.sum(np.square(H1y)))/H1_ref
-        # if divmod(i, 10):
-        yield T_kal, i, err, conv
-    # print i, conv, err
-    print "Norme H1 du Kalman", err
-
+# For animation purpose
 def run(data):
     # update the data
     field, i, err, conv = data
@@ -500,6 +292,71 @@ def run(data):
     ax.set_zlim(-1, 1)
     ax.set_title('It = ' + str(i) + ',\n conv = ' + str(conv) + ',\n err = ' + str(err))
     return surf,
+# ===========================REAL PROGRAM START================================
+
+# Let's make a proper simulation.
+nx, ny = 10, 20
+
+# ------------------------ Initialize arrays ----------------------------
+T_ref = np.zeros([nx, ny])
+T_mes = np.zeros([nx, ny])
+T_bnd = np.zeros([nx, ny])
+T_sim = np.zeros([nx, ny])
+T_kal = np.zeros([nx, ny])
+
+H1 = np.zeros([nx, ny])
+H1x = np.zeros([nx, ny])
+H1y = np.zeros([nx, ny])
+
+# ------------------------ Initialize "reality"  ----------------------------
+
+reality = Reality(nx, ny)
+reality.Compute()
+mesh = reality.GetGrid()
+T_ref = reality.GetT()
+
+H1 = T_ref
+H1x = mesh.derx(H1)
+H1y = mesh.dery(H1)
+H1_ref = np.sqrt(np.sum(np.square(H1)) + np.sum(np.square(H1x)) + np.sum(np.square(H1y)))
+
+fig = plt.figure()
+ax = fig.gca(projection='3d')
+ax.set_xlim(-1, 1)
+ax.set_ylim(-1, 1)
+ax.set_zlim(-1, 1)
+surf = ax.plot_surface(mesh.coordx, mesh.coordy, T_ref, rstride=1, cstride=1, cmap=cm.coolwarm,
+                       linewidth=0, antialiased=False)
+fig.colorbar(surf, shrink=0.5, aspect=5)
+plt.show()
+
+# ------------------------ Operate Observation ----------------------------
+
+T_mes = reality.GetTWithNoise()
+H1 = T_ref - T_mes
+H1x = mesh.derx(H1)
+H1y = mesh.dery(H1)
+err = np.sqrt(np.sum(np.square(H1)) + np.sum(np.square(H1x)) + np.sum(np.square(H1y))) / H1_ref
+print "Norme H1 de la mesure", err
+
+fig = plt.figure()
+ax = fig.gca(projection='3d')
+ax.set_xlim(-1, 1)
+ax.set_ylim(-1, 1)
+ax.set_zlim(-1, 1)
+surf = ax.plot_surface(mesh.coordx, mesh.coordy, T_mes, rstride=1, cstride=1, cmap=cm.coolwarm,
+                       linewidth=0, antialiased=False)
+fig.colorbar(surf, shrink=0.5, aspect=5)
+plt.show()
+
+# ------------------------ Compute simulation without Kalman ----------------------------
+
+# Bad boundary conditions
+T_bnd = reality.GetTWithNoise()
+simulation = Simulation(nx, ny, T_bnd)
+# Bad initial solution
+T_bnd = reality.GetTWithNoise()
+simulation.field = T_bnd
 
 
 print "Simulation sans Kalman..."
@@ -509,9 +366,25 @@ ax.set_xlim(-1, 1)
 ax.set_ylim(-1, 1)
 ax.set_zlim(-1, 1)
 fig.colorbar(surf, shrink=0.5, aspect=5)
-ani = animation.FuncAnimation(fig, run, data_gen_sim, blit=False, interval=10,
+ani = animation.FuncAnimation(fig, run, simulation.data_gen, blit=False, interval=10,
                               repeat=False)
 plt.show()
+
+# ------------------------ Compute simulation with Kalman ----------------------------
+
+M = np.eye(simulation.size)  # Observation matrix.
+B = np.eye(simulation.size)  # Control matrix.
+S = np.eye(simulation.size)        # Initial covariance estimate.
+R = np.eye(simulation.size) * 0.2  # Estimated error in measurements.
+Q = np.eye(simulation.size) * 0    # Estimated error in process.
+X = np.zeros([simulation.size])
+Y = np.zeros([simulation.size])
+
+# Bad initial condition
+X = np.reshape(reality.GetTWithNoise(), [simulation.size])
+# Bad boundary conditions
+Y = np.reshape(reality.GetTWithNoise(), [simulation.size])
+kf = KalmanFilterLinear(simulation.Mat, B, M, X, S, Q, R, nx, ny, Y)
 
 print "Simulation avec Kalman..."
 fig = plt.figure()
@@ -520,6 +393,6 @@ ax.set_xlim(-1, 1)
 ax.set_ylim(-1, 1)
 ax.set_zlim(-1, 1)
 fig.colorbar(surf, shrink=0.5, aspect=5)
-ani = animation.FuncAnimation(fig, run, data_gen_kal, blit=False, interval=10,
+ani = animation.FuncAnimation(fig, run, kf.data_gen, blit=False, interval=10,
                               repeat=False)
 plt.show()
