@@ -1,5 +1,6 @@
 #!/usr/bin/python2
 
+import math
 import random
 import numpy as np
 import matplotlib.pyplot as plt
@@ -117,10 +118,10 @@ class Reality:
     def GetGrid(self):
         return self.grid
 
-    def GetT(self):
+    def GetSol(self):
         return self.field
 
-    def GetTWithNoise(self):
+    def GetSolWithNoise(self):
         field_with_noise = np.zeros([self.grid.nx, self.grid.ny])
         for i in range(self.grid.nx):
             for j in range(self.grid.ny):
@@ -132,17 +133,6 @@ class Reality:
             for j in range(self.grid.ny):
                 self.field[i][j] = 1.-self.source_term * (
                     (self.grid.coordx[i][j])**2 + (self.grid.coordy[i][j])**2)/4.
-
-    def plot(self, field):
-        fig = plt.figure()
-        ax = fig.gca(projection='3d')
-        ax.set_xlim(-1, 1)
-        ax.set_ylim(-1, 1)
-        ax.set_zlim(-1, 1)
-        surf = ax.plot_surface(self.grid.coordx, self.grid.coordy, field, rstride=1,
-                               cstride=1, cmap=cm.coolwarm, linewidth=0, antialiased=False)
-        fig.colorbar(surf, shrink=0.5, aspect=5)
-        plt.show()
 
 
 class Simulation:
@@ -194,10 +184,10 @@ class Simulation:
             self.rhs[indx(i, ny-1)] = 0.
         self.field = np.zeros([self.size])
 
-    def GetT(self):
+    def GetSol(self):
         return np.reshape(self.field, [self.grid.nx, self.grid.ny])
 
-    def SetT(self, _field):
+    def SetSol(self, _field):
         self.field = np.reshape(_field, [self.size])
 
     # Increment through the next time step of the simulation.
@@ -219,6 +209,7 @@ class Simulation:
             i += 1
             conv = self.Step()
 
+    # For animation purpose
     def data_gen(self):
         i = 0
         conv = 1.
@@ -226,15 +217,14 @@ class Simulation:
         while conv > 1e-3:
             i += 1
             conv = self.Step()
-            T_sim = self.GetT()
-            err = self.grid.norm(T_ref - T_sim)
-            yield T_sim, i, err, conv
+            Sol_sim = self.GetSol()
+            err = self.grid.norm(Sol_ref - Sol_sim)
+            yield Sol_sim, i, err, conv
 
         # print i, conv
         print "Norme H1 de la simulation", err
 
     def animate(self):
-        # For animation purpose
         def run(data):
             # update the data
             field, i, err, conv = data
@@ -280,33 +270,37 @@ class Chaleur:
                                cstride=1, cmap=cm.coolwarm, linewidth=0, antialiased=False)
         fig.colorbar(surf, shrink=0.5, aspect=5)
         plt.show()
+
+    def norm(self, field):
+        return self.grid.norm(field)
+
 # ------------------------ Initialize "reality"  ----------------------------
 
 edp = Chaleur()
 edp.reality.Compute()
 
-T_ref = edp.reality.GetT()
-H1_ref = edp.grid.norm(T_ref)
-edp.reality.plot(T_ref)
+Sol_ref = edp.reality.GetSol()
+Norm_ref = edp.norm(Sol_ref)
+edp.plot(Sol_ref)
 
 # ------------------------ Operate Observation ----------------------------
 
-T_mes = edp.reality.GetTWithNoise()
-H1_mes = edp.grid.norm(T_ref - T_mes) / H1_ref
-print "Norme H1 de la mesure", H1_mes
-edp.reality.plot(T_mes)
+Sol_mes = edp.reality.GetSolWithNoise()
+Err_mes = edp.norm(Sol_ref - Sol_mes) / Norm_ref
+print "Norme H1 de la mesure", Err_mes
+edp.plot(Sol_mes)
 
 # ------------------------ Compute simulation without Kalman ----------------------------
 
 # Bad initial solution and boundary condition
-edp.simulation.SetT(edp.reality.GetTWithNoise())
+edp.simulation.SetSol(edp.reality.GetSolWithNoise())
 print "Simulation sans Kalman..."
 
 if False:
     edp.simulation.compute()
-    T_sim = edp.simulation.GetT()
-    H1_sim = edp.grid.norm(T_ref - T_sim) / H1_ref
-    print "Norme H1 de la simu", H1_sim
-    edp.reality.plot(T_sim)
+    Sol_sim = edp.simulation.GetSol()
+    Err_sim = edp.norm(Sol_ref - Sol_sim) / Norm_ref
+    print "Norme H1 de la simu", Err_sim
+    edp.plot(Sol_sim)
 else:
     edp.simulation.animate()
