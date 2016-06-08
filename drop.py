@@ -4,6 +4,7 @@ import math
 import random
 import numpy as np
 import matplotlib.pyplot as plt
+from kalman import KalmanFilter
 
 
 class Reality:
@@ -17,36 +18,35 @@ class Reality:
         self.Tfin = _Tfin
         self.It = _It
         self.dt = _Tfin/_It
-        self.field = np.zeros([_It, 4])
-        self.field[0] = np.array([0.,
-                                  self.power * math.cos(self.dir * math.pi / 180.),
-                                  0.,
-                                  self.power * math.sin(self.dir * math.pi / 180.)])
+        self.field = np.zeros([4])
+        self.init = np.array([0.,
+                              self.power * math.cos(self.dir * math.pi / 180.),
+                              0.,
+                              self.power * math.sin(self.dir * math.pi / 180.)])
 
     def GetSol(self):
         return self.field
 
     def GetSolWithNoise(self):
-        field_with_noise = np.zeros([self.It, 4])
-        for i in range(self.It):
-            for j in range(4):
-                field_with_noise[i][j] = random.gauss(self.field[i][j], self.noiselevel)
+        field_with_noise = np.zeros([4])
+        for i in range(4):
+            field_with_noise[i] = random.gauss(self.field[i], self.noiselevel)
         return field_with_noise
 
     def Compute(self):
         for i in range(self.It):
-            t = i * self.dt
-            self.field[i][0] = self.field[0][1] * t + 0.
-            self.field[i][1] = self.field[0][1]
-            self.field[i][2] = 0.5 * self.g * t *t + self.field[0][3] * t + 0.
-            self.field[i][3] = self.g * t + self.field[0][3]
+            time = i * self.dt
+            self.field[0] = self.init[0] + self.init[1] * time
+            self.field[1] = self.init[1]
+            self.field[2] = self.init[2] + self.init[3] * time + 0.5 * self.g * time * time
+            self.field[3] = self.init[3] + self.g * time
+            yield i
 
 
 class Simulation:
     # --------------------------------VARIABLES----------------------------------
     power = 100
     dir = 45
-    current_it = 0
 
     # ---------------------------------METHODS-----------------------------------
     def __init__(self, _Tfin, _It, _noiselevel):
@@ -68,22 +68,20 @@ class Simulation:
                                   0.,
                                   self.power * math.sin(self.dir * math.pi / 180.)])
 
-    def GetSol(self):
+    def GetSol(self):         # Get current Solution
         return self.field
 
-    def SetSol(self, field):
+    def SetSol(self, field):  # Set current Solution
         self.field = field
 
-    # Increment through the next time step of the simulation.
-    def Step(self):
-        self.field[self.current_it + 1, :] = self.Mat.dot(self.field[self.current_it, :])\
-                                           + self.source_term
+    def Step(self):           # Increment through the next time step of the simulation.
+        self.field = self.Mat.dot(self.field) + self.source_term
 
-    def compute(self):
+    def Compute(self):
         for i in range(self.It):
             if i > 0:
                 self.Step()
-                self.current_it += 1
+            yield i
 
 
 class Drop:
@@ -95,12 +93,19 @@ class Drop:
         self.reality = Reality(self.Tfin, self.Iterations, self.noiselevel)
         self.simulation = Simulation(self.Tfin, self.Iterations, self.noiselevel)
 
+        self.kalsim = Simulation(self.Tfin, self.Iterations, self.noiselevel)
+        _M = np.eye(4)                   # Observation matrix.
+        self.kalman = KalmanFilter(self.kalsim, self.reality, _M)
+        self.kalman.S = np.eye(4)        # Initial covariance estimate.
+        self.kalman.R = np.eye(4) * 0.2  # Estimated error in measurements.
+        self.kalman.Q = np.eye(4) * 0.    # Estimated error in process.
+
     def plot(self, field):
         fig = plt.figure()
         ax = fig.gca()
         plt.xlabel('X position')
         plt.ylabel('Y position')
-        ax.set_xlim(0, 1500)
+        # ax.set_xlim(0, 1500)
         # plt.title('Measurement of a Cannonball in Flight')
         plt.plot(field[:, 0], field[:, 2])
         # plt.legend(('reality', 'simulated', 'measured', 'kalman'))
@@ -112,6 +117,7 @@ class Drop:
         plt.xlabel('X position')
         plt.ylabel('Y position')
         ax.set_xlim(0, 1500)
+        ax.set_ylim(-600, 400)
         # plt.title('Measurement of a Cannonball in Flight')
         plt.plot(field_ref[:, 0], field_ref[:, 2], '-',
                  field_mes[:, 0], field_mes[:, 2], ':',
@@ -123,18 +129,23 @@ class Drop:
     def norm(self, field):
         return np.sqrt(np.sum(np.square(field)))
 
-# ------------------------ Initialize "reality"  ----------------------------
+
+# ------------------------ Begin program ----------------------------
 
 edp = Drop()
-edp.reality.Compute()
+Sol_ref = np.zeros([edp.Iterations, 4])
+Sol_mes = np.zeros([edp.Iterations, 4])
+Sol_sim = np.zeros([edp.Iterations, 4])
+Sol_kal = np.zeros([edp.Iterations, 4])
 
-Sol_ref = edp.reality.GetSol()
+# ----------------- Compute reality and measurement --------------------
+for it in edp.reality.Compute():
+    Sol_ref[it, :] = edp.reality.GetSol()
+    Sol_mes[it, :] = edp.reality.GetSolWithNoise()
+
 Norm_ref = edp.norm(Sol_ref)
 # edp.plot(Sol_ref)
 
-# ------------------------ Operate Observation ----------------------------
-
-Sol_mes = edp.reality.GetSolWithNoise()
 Err_mes = edp.norm(Sol_ref - Sol_mes) / Norm_ref
 print "Norme H1 de la mesure", Err_mes
 # edp.plot(Sol_mes)
@@ -142,18 +153,34 @@ print "Norme H1 de la mesure", Err_mes
 # ------------------------ Compute simulation without Kalman ----------------------------
 
 # Bad initial solution
-edp.simulation.SetSol(edp.reality.GetSolWithNoise())
-print "Simulation sans Kalman..."
+edp.simulation.SetSol(Sol_mes[0, :])
 
-if True:
-    edp.simulation.compute()
-    Sol_sim = edp.simulation.GetSol()
-    Err_sim = edp.norm(Sol_ref - Sol_sim) / Norm_ref
-    print "Norme H1 de la simu", Err_sim
-    # edp.plot(Sol_sim)
-else:
-    edp.simulation.animate()
-    Sol_sim = edp.simulation.GetSol()
+for it in edp.simulation.Compute():
+    Sol_sim[it, :] = edp.simulation.GetSol()
+
+Err_sim = edp.norm(Sol_ref - Sol_sim) / Norm_ref
+print "Norme H1 de la simu", Err_sim
+# edp.plot(Sol_sim)
+
+# ------------------------ Compute simulation with Kalman ----------------------------
+
+# Bad initial solution
+edp.kalsim.SetSol(Sol_mes[0, :])
+edp.kalman.SetMes(Sol_mes[0, :])
+
+it = 0
+for it in edp.kalman.Compute():
+    Sol_kal[it, :] = edp.kalman.GetSol()
+    if it < edp.Iterations:
+        edp.kalman.SetMes(Sol_mes[it, :])
+    # edp.plot(Sol_kal)
+
+Err_kal = edp.norm(Sol_ref - Sol_kal) / Norm_ref
+print "Norme H1 de la simu filtre", Err_kal
+# edp.plot(Sol_kal)
 
 
-edp.plotall(Sol_ref, Sol_mes, Sol_sim, Sol_sim)
+# ------------------------ Final plot ----------------------------
+
+edp.plotall(Sol_ref, Sol_mes, Sol_sim, Sol_kal)
+# edp.plotall(Sol_ref, Sol_ref, Sol_sim, Sol_kal)
