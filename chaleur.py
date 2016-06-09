@@ -7,7 +7,7 @@ import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
 from matplotlib import cm
 from matplotlib import animation
-from kalman import KalmanFilterChaleur
+from kalman import KalmanFilter
 
 
 class Grid:
@@ -213,7 +213,7 @@ class KalmanWrapper:
         self.kalsim = _sim
         self.size = self.kalsim.size
         _M = np.eye(self.kalsim.size)  # Observation matrix.
-        self.kalman = KalmanFilterChaleur(self.kalsim, _M)
+        self.kalman = KalmanFilter(self.kalsim, _M)
         self.kalman.S = np.eye(self.kalman.size_s)  # Initial covariance estimate.
         self.kalman.R = np.eye(self.kalman.size_o) * 0.2  # Estimated error in measurements.
         self.kalman.Q = np.eye(self.kalman.size_s) * 0.  # Estimated error in process.

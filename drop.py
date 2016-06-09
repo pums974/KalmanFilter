@@ -4,7 +4,7 @@ import math
 import random
 import numpy as np
 import matplotlib.pyplot as plt
-from kalman import KalmanFilterDrop
+from kalman import KalmanFilter
 
 
 class Reality:
@@ -73,11 +73,35 @@ class Simulation:
     def Step(self):           # Increment through the next time step of the simulation.
         self.field = self.Mat.dot(self.field) + self.source_term
 
-    def Compute(self):
-        for i in range(self.It):
-            if i > 0:
-                self.Step()
-            yield i
+
+class KalmanWrapper:
+    def __init__(self, _reality, _sim):
+        self.reality = _reality
+        self.kalsim = _sim
+        self.It = _sim.It
+        _M = np.array([[1, 0, 0, 0],
+                       [0, 0, 1, 0]])  # Observation matrix.
+
+        self.kalman = KalmanFilter(self.kalsim, _M)
+        self.kalman.S = np.eye(self.kalman.size_s)  # Initial covariance estimate.
+        self.kalman.R = np.eye(self.kalman.size_o) * 0.2  # Estimated error in measurements.
+        self.kalman.Q = np.eye(self.kalman.size_s) * 0.  # Estimated error in process.
+
+    def SetMes(self, field):
+        self.kalman.Y = self.kalman.M.dot(field[..., np.newaxis])
+
+    def GetSol(self):
+        return self.kalman.X.flatten()
+
+    def SetSol(self, field):
+        self.kalman.X = field[..., np.newaxis]
+        self.kalsim.SetSol(field)
+
+    def Step(self):
+        self.kalsim.Step()
+        self.SetSol(self.kalsim.GetSol())
+        self.kalman.Apply()
+        self.kalsim.SetSol(self.GetSol())
 
 
 class Drop:
@@ -88,14 +112,14 @@ class Drop:
     def __init__(self):
         self.reality = Reality(self.Tfin, self.Iterations, self.noiselevel)
         self.simulation = Simulation(self.Tfin, self.Iterations, self.noiselevel)
-
         self.kalsim = Simulation(self.Tfin, self.Iterations, self.noiselevel)
-        _M = np.array([[1, 0, 0, 0],
-                       [0, 0, 1, 0]])  # Observation matrix.
-        self.kalman = KalmanFilterDrop(self.kalsim, _M)
-        self.kalman.S = np.eye(self.kalman.size_s)        # Initial covariance estimate.
-        self.kalman.R = np.eye(self.kalman.size_o) * 0.2  # Estimated error in measurements.
-        self.kalman.Q = np.eye(self.kalman.size_s) * 0.   # Estimated error in process.
+        self.kalman = KalmanWrapper(self.reality, self.kalsim)
+
+    def Compute(self, simu):
+        for i in range(simu.It):
+            if i > 0:
+                simu.Step()
+            yield i
 
     def plot(self, field):
         fig = plt.figure()
@@ -152,7 +176,7 @@ print "Norme H1 de la mesure", Err_mes
 # Bad initial solution
 edp.simulation.SetSol(Sol_mes[0, :])
 
-for it in edp.simulation.Compute():
+for it in edp.Compute(edp.simulation):
     Sol_sim[it, :] = edp.simulation.GetSol()
 
 Err_sim = edp.norm(Sol_ref - Sol_sim) / Norm_ref
@@ -166,7 +190,7 @@ edp.kalsim.SetSol(Sol_mes[0, :])
 edp.kalman.SetMes(Sol_mes[1, :])
 
 it = 0
-for it in edp.kalman.Compute():
+for it in edp.Compute(edp.kalman):
     Sol_kal[it, :] = edp.kalman.GetSol()
     if it < edp.Iterations-1:
         edp.kalman.SetMes(Sol_mes[it+1, :])
