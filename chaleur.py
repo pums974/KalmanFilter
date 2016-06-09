@@ -7,6 +7,7 @@ import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
 from matplotlib import cm
 from matplotlib import animation
+from kalman import KalmanFilterChaleur
 
 
 class Grid:
@@ -101,10 +102,13 @@ class Grid:
 
         return ddery
 
-    def norm(self, field):
+    def normH1(self, field):
         H1x = self.derx(field)
         H1y = self.dery(field)
         return np.sqrt(np.sum(np.square(field)) + np.sum(np.square(H1x)) + np.sum(np.square(H1y)))
+
+    def normL2(self, field):
+        return np.sqrt(np.sum(np.square(field)))
 
 
 class Reality:
@@ -139,6 +143,9 @@ class Simulation:
     # --------------------------------PARAMETERS--------------------------------
     dt = 0.01
     cfl = 1./4.
+    conv = 1.
+    conv_crit = 1e-3
+    err = 999
 
     # ---------------------------------METHODS-----------------------------------
     def __init__(self, _grid, _source_term):
@@ -183,6 +190,7 @@ class Simulation:
             self.rhs[indx(i, 0)] = 0.
             self.rhs[indx(i, ny-1)] = 0.
         self.field = np.zeros([self.size])
+        self.oldfield = np.zeros([self.size])
 
     def GetSol(self):
         return np.reshape(self.field, [self.grid.nx, self.grid.ny])
@@ -192,59 +200,40 @@ class Simulation:
 
     # Increment through the next time step of the simulation.
     def Step(self):
+        self.field = self.Mat.dot(self.field) + self.rhs
 
-        new_field = self.Mat.dot(self.field)
-        new_field += self.rhs
 
-        _conv = np.sqrt(np.sum(np.square(self.field - new_field)))
-        self.field = new_field
+class KalmanWrapper:
+    conv = 1.
+    conv_crit = 1e-2
+    err = 999
 
-        return _conv
+    def __init__(self, _reality, _sim):
+        self.reality = _reality
+        self.kalsim = _sim
+        self.size = self.kalsim.size
+        _M = np.eye(self.kalsim.size)  # Observation matrix.
+        self.kalman = KalmanFilterChaleur(self.kalsim, _M)
+        self.kalman.S = np.eye(self.kalman.size_s)  # Initial covariance estimate.
+        self.kalman.R = np.eye(self.kalman.size_o) * 0.2  # Estimated error in measurements.
+        self.kalman.Q = np.eye(self.kalman.size_s) * 0.  # Estimated error in process.
 
-    def compute(self):
-        i = 0
-        conv = 1.
-        err = 999.
-        while conv > 1e-3:
-            i += 1
-            conv = self.Step()
+    def SetMes(self, field):
+        self.kalman.Y = self.kalman.M.dot(np.reshape(field, self.kalman.size_s))
 
-    # For animation purpose
-    def data_gen(self):
-        i = 0
-        conv = 1.
-        err = 999.
-        while conv > 1e-3:
-            i += 1
-            conv = self.Step()
-            Sol_sim = self.GetSol()
-            err = self.grid.norm(Sol_ref - Sol_sim)
-            yield Sol_sim, i, err, conv
+    def GetSol(self):
+        return np.reshape(self.kalman.X, [self.kalsim.grid.nx, self.kalsim.grid.ny])
 
-        # print i, conv
-        print "Norme H1 de la simulation", err
+    def SetSol(self, field):
+        self.kalman.X = np.reshape(field, self.kalman.size_s)
+        self.kalsim.SetSol(field)
 
-    def animate(self):
-        def run(data):
-            # update the data
-            field, i, err, conv = data
-            ax.clear()
-            surf = ax.plot_surface(self.grid.coordx, self.grid.coordy, field, rstride=1,
-                                   cstride=1, cmap=cm.coolwarm, linewidth=0, antialiased=False)
-            ax.set_xlim(-1, 1)
-            ax.set_ylim(-1, 1)
-            ax.set_zlim(-1, 1)
-            ax.set_title('It = ' + str(i) + ',\n conv = ' + str(conv) + ',\n err = ' + str(err))
-            return surf,
-
-        fig = plt.figure()
-        ax = fig.gca(projection='3d')
-        ax.set_xlim(-1, 1)
-        ax.set_ylim(-1, 1)
-        ax.set_zlim(-1, 1)
-        ani = animation.FuncAnimation(fig, run, self.data_gen, blit=False, interval=10,
-                                      repeat=False)
-        plt.show()
+    def Step(self):
+        self.kalsim.Step()
+        self.SetSol(self.kalsim.GetSol())
+        self.SetMes(self.reality.GetSolWithNoise())
+        self.kalman.Apply()
+        self.kalsim.SetSol(self.GetSol())
 
 
 class Chaleur:
@@ -259,6 +248,20 @@ class Chaleur:
         self.grid = Grid(self.nx, self.ny, self.Lx, self.Ly)
         self.reality = Reality(self.grid, self.source_term, self.noiselevel)
         self.simulation = Simulation(self.grid, self.source_term)
+        self.kalsim = Simulation(self.grid, self.source_term)
+
+        self.kalman = KalmanWrapper(self.reality, self.kalsim)
+
+    def Compute(self, simu):
+        i = 0
+        while simu.conv > simu.conv_crit:
+            i += 1
+            oldfield = simu.GetSol()
+            simu.Step()
+            newfield = simu.GetSol()
+            simu.conv = self.normL2(oldfield - newfield)
+            simu.err = self.normH1(simu.GetSol() - self.reality.GetSol())
+            yield i
 
     def plot(self, field):
         fig = plt.figure()
@@ -271,8 +274,32 @@ class Chaleur:
         fig.colorbar(surf, shrink=0.5, aspect=5)
         plt.show()
 
-    def norm(self, field):
-        return self.grid.norm(field)
+    def normH1(self, field):
+        return self.grid.normH1(field)
+
+    def normL2(self, field):
+        return self.grid.normL2(field)
+
+    def animate(self, simu):
+        def run(i):
+            ax.clear()
+            surf = ax.plot_surface(self.grid.coordx, self.grid.coordy, simu.GetSol(), rstride=1,
+                                   cstride=1, cmap=cm.coolwarm, linewidth=0, antialiased=False)
+            ax.set_xlim(-1, 1)
+            ax.set_ylim(-1, 1)
+            ax.set_zlim(-1, 1)
+            ax.set_title('It = ' + str(i) + ',\n conv = ' + str(simu.conv) + ',\n err = ' + str(simu.err))
+            return surf,
+
+        fig = plt.figure()
+        ax = fig.gca(projection='3d')
+        ax.set_xlim(-1, 1)
+        ax.set_ylim(-1, 1)
+        ax.set_zlim(-1, 1)
+
+        ani = animation.FuncAnimation(fig, run, self.Compute(simu), blit=False, interval=10,
+                                      repeat=False)
+        plt.show()
 
 # ------------------------ Initialize "reality"  ----------------------------
 
@@ -280,27 +307,48 @@ edp = Chaleur()
 edp.reality.Compute()
 
 Sol_ref = edp.reality.GetSol()
-Norm_ref = edp.norm(Sol_ref)
+Norm_ref = edp.normH1(Sol_ref)
 edp.plot(Sol_ref)
 
 # ------------------------ Operate Observation ----------------------------
 
 Sol_mes = edp.reality.GetSolWithNoise()
-Err_mes = edp.norm(Sol_ref - Sol_mes) / Norm_ref
+Err_mes = edp.normH1(Sol_ref - Sol_mes) / Norm_ref
 print "Norme H1 de la mesure", Err_mes
 edp.plot(Sol_mes)
 
 # ------------------------ Compute simulation without Kalman ----------------------------
-
+print "Simulation sans Kalman..."
 # Bad initial solution and boundary condition
 edp.simulation.SetSol(edp.reality.GetSolWithNoise())
-print "Simulation sans Kalman..."
 
 if False:
-    edp.simulation.compute()
+    for it in edp.Compute(edp.simulation):
+        pass
     Sol_sim = edp.simulation.GetSol()
-    Err_sim = edp.norm(Sol_ref - Sol_sim) / Norm_ref
+    Err_sim = edp.normH1(Sol_ref - Sol_sim) / Norm_ref
     print "Norme H1 de la simu", Err_sim
     edp.plot(Sol_sim)
 else:
-    edp.simulation.animate()
+    edp.animate(edp.simulation)
+    Sol_sim = edp.simulation.GetSol()
+    Err_sim = edp.normH1(Sol_ref - Sol_sim) / Norm_ref
+    print "Norme H1 de la simu", Err_sim
+
+# ------------------------ Compute simulation with Kalman ----------------------------
+print "Simulation avec Kalman..."
+# Bad initial solution
+edp.kalman.SetSol(np.reshape(edp.reality.GetSolWithNoise(), [edp.kalman.size]))
+
+if False:
+    for it in edp.Compute(edp.kalman):
+        pass
+    Sol_kal = edp.kalman.GetSol()
+    Err_kal = edp.normH1(Sol_ref - Sol_kal) / Norm_ref
+    print "Norme H1 de la simu filtre", Err_kal
+    edp.plot(Sol_kal)
+else:
+    edp.animate(edp.kalman)
+    Sol_kal = edp.kalman.GetSol()
+    Err_kal = edp.normH1(Sol_ref - Sol_kal) / Norm_ref
+    print "Norme H1 de la simu filtre", Err_kal

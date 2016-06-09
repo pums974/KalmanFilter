@@ -4,7 +4,7 @@ import math
 import random
 import numpy as np
 import matplotlib.pyplot as plt
-from kalman import KalmanFilter
+from kalman import KalmanFilterDrop
 
 
 class Reality:
@@ -63,10 +63,6 @@ class Simulation:
                                      0,
                                      -0.5 * 9.81 * self.dt * self.dt,
                                      -9.81 * self.dt])
-        self.field[0] = np.array([0.,
-                                  self.power * math.cos(self.dir * math.pi / 180.),
-                                  0.,
-                                  self.power * math.sin(self.dir * math.pi / 180.)])
 
     def GetSol(self):         # Get current Solution
         return self.field
@@ -94,11 +90,12 @@ class Drop:
         self.simulation = Simulation(self.Tfin, self.Iterations, self.noiselevel)
 
         self.kalsim = Simulation(self.Tfin, self.Iterations, self.noiselevel)
-        _M = np.eye(4)                   # Observation matrix.
-        self.kalman = KalmanFilter(self.kalsim, self.reality, _M)
-        self.kalman.S = np.eye(4)        # Initial covariance estimate.
-        self.kalman.R = np.eye(4) * 0.2  # Estimated error in measurements.
-        self.kalman.Q = np.eye(4) * 0.    # Estimated error in process.
+        _M = np.array([[1, 0, 0, 0],
+                       [0, 0, 1, 0]])  # Observation matrix.
+        self.kalman = KalmanFilterDrop(self.kalsim, _M)
+        self.kalman.S = np.eye(self.kalman.size_s)        # Initial covariance estimate.
+        self.kalman.R = np.eye(self.kalman.size_o) * 0.2  # Estimated error in measurements.
+        self.kalman.Q = np.eye(self.kalman.size_s) * 0.   # Estimated error in process.
 
     def plot(self, field):
         fig = plt.figure()
@@ -166,21 +163,19 @@ print "Norme H1 de la simu", Err_sim
 
 # Bad initial solution
 edp.kalsim.SetSol(Sol_mes[0, :])
-edp.kalman.SetMes(Sol_mes[0, :])
+edp.kalman.SetMes(Sol_mes[1, :])
 
 it = 0
 for it in edp.kalman.Compute():
     Sol_kal[it, :] = edp.kalman.GetSol()
-    if it < edp.Iterations:
-        edp.kalman.SetMes(Sol_mes[it, :])
+    if it < edp.Iterations-1:
+        edp.kalman.SetMes(Sol_mes[it+1, :])
     # edp.plot(Sol_kal)
 
 Err_kal = edp.norm(Sol_ref - Sol_kal) / Norm_ref
 print "Norme H1 de la simu filtre", Err_kal
 # edp.plot(Sol_kal)
 
-
 # ------------------------ Final plot ----------------------------
 
 edp.plotall(Sol_ref, Sol_mes, Sol_sim, Sol_kal)
-# edp.plotall(Sol_ref, Sol_ref, Sol_sim, Sol_kal)
