@@ -44,7 +44,7 @@ class Reality:
 
 
 class Simulation:
-    # --------------------------------VARIABLES----------------------------------
+    # --------------------------------PARAMETERS--------------------------------
     power = 100
     dir = 45
 
@@ -121,6 +121,9 @@ class Drop:
                 simu.Step()
             yield i
 
+    def norm(self, field):
+        return np.sqrt(np.sum(np.square(field)))
+
     def plot(self, field):
         fig = plt.figure()
         ax = fig.gca()
@@ -146,9 +149,6 @@ class Drop:
                  field_kal[:, 0], field_kal[:, 2], '--')
         plt.legend(('reality', 'measured', 'simulated', 'kalman'))
         plt.show()
-
-    def norm(self, field):
-        return np.sqrt(np.sum(np.square(field)))
 
 
 # ------------------------ Begin program ----------------------------

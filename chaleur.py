@@ -119,9 +119,6 @@ class Reality:
         self.grid = _grid
         self.field = np.zeros([self.grid.nx, self.grid.ny])
 
-    def GetGrid(self):
-        return self.grid
-
     def GetSol(self):
         return self.field
 
@@ -192,14 +189,13 @@ class Simulation:
         self.field = np.zeros([self.size])
         self.oldfield = np.zeros([self.size])
 
-    def GetSol(self):
+    def GetSol(self):         # Get current Solution
         return np.reshape(self.field, [self.grid.nx, self.grid.ny])
 
-    def SetSol(self, _field):
-        self.field = np.reshape(_field, [self.size])
+    def SetSol(self, field):  # Set current Solution
+        self.field = np.reshape(field, [self.size])
 
-    # Increment through the next time step of the simulation.
-    def Step(self):
+    def Step(self):           # Increment through the next time step of the simulation.
         self.field = self.Mat.dot(self.field) + self.rhs
 
 
@@ -249,7 +245,6 @@ class Chaleur:
         self.reality = Reality(self.grid, self.source_term, self.noiselevel)
         self.simulation = Simulation(self.grid, self.source_term)
         self.kalsim = Simulation(self.grid, self.source_term)
-
         self.kalman = KalmanWrapper(self.reality, self.kalsim)
 
     def Compute(self, simu):
@@ -263,6 +258,12 @@ class Chaleur:
             simu.err = self.normH1(simu.GetSol() - self.reality.GetSol())
             yield i
 
+    def normH1(self, field):
+        return self.grid.normH1(field)
+
+    def normL2(self, field):
+        return self.grid.normL2(field)
+
     def plot(self, field):
         fig = plt.figure()
         ax = fig.gca(projection='3d')
@@ -273,12 +274,6 @@ class Chaleur:
                                cstride=1, cmap=cm.coolwarm, linewidth=0, antialiased=False)
         fig.colorbar(surf, shrink=0.5, aspect=5)
         plt.show()
-
-    def normH1(self, field):
-        return self.grid.normH1(field)
-
-    def normL2(self, field):
-        return self.grid.normL2(field)
 
     def animate(self, simu):
         def run(i):
@@ -301,18 +296,19 @@ class Chaleur:
                                       repeat=False)
         plt.show()
 
-# ------------------------ Initialize "reality"  ----------------------------
+# ------------------------ Begin program ----------------------------
 
 edp = Chaleur()
+
+# ----------------- Compute reality and measurement --------------------
 edp.reality.Compute()
 
 Sol_ref = edp.reality.GetSol()
+Sol_mes = edp.reality.GetSolWithNoise()
+
 Norm_ref = edp.normH1(Sol_ref)
 edp.plot(Sol_ref)
 
-# ------------------------ Operate Observation ----------------------------
-
-Sol_mes = edp.reality.GetSolWithNoise()
 Err_mes = edp.normH1(Sol_ref - Sol_mes) / Norm_ref
 print "Norme H1 de la mesure", Err_mes
 edp.plot(Sol_mes)
@@ -326,29 +322,25 @@ if False:
     for it in edp.Compute(edp.simulation):
         pass
     Sol_sim = edp.simulation.GetSol()
-    Err_sim = edp.normH1(Sol_ref - Sol_sim) / Norm_ref
-    print "Norme H1 de la simu", Err_sim
     edp.plot(Sol_sim)
 else:
     edp.animate(edp.simulation)
     Sol_sim = edp.simulation.GetSol()
-    Err_sim = edp.normH1(Sol_ref - Sol_sim) / Norm_ref
-    print "Norme H1 de la simu", Err_sim
+Err_sim = edp.normH1(Sol_ref - Sol_sim) / Norm_ref
+print "Norme H1 de la simu", Err_sim
 
 # ------------------------ Compute simulation with Kalman ----------------------------
 print "Simulation avec Kalman..."
 # Bad initial solution
-edp.kalman.SetSol(np.reshape(edp.reality.GetSolWithNoise(), [edp.kalman.size]))
+edp.kalman.SetSol(edp.reality.GetSolWithNoise())
 
 if False:
     for it in edp.Compute(edp.kalman):
         pass
     Sol_kal = edp.kalman.GetSol()
-    Err_kal = edp.normH1(Sol_ref - Sol_kal) / Norm_ref
-    print "Norme H1 de la simu filtre", Err_kal
     edp.plot(Sol_kal)
 else:
     edp.animate(edp.kalman)
     Sol_kal = edp.kalman.GetSol()
-    Err_kal = edp.normH1(Sol_ref - Sol_kal) / Norm_ref
-    print "Norme H1 de la simu filtre", Err_kal
+Err_kal = edp.normH1(Sol_ref - Sol_kal) / Norm_ref
+print "Norme H1 de la simu filtre", Err_kal
