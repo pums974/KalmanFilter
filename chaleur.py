@@ -208,11 +208,22 @@ class KalmanWrapper:
         self.reality = _reality
         self.kalsim = _sim
         self.size = self.kalsim.size
-        _M = np.eye(self.kalsim.size)  # Observation matrix.
+        _M = self.GetWindow()  # Observation matrix.
         self.kalman = KalmanFilter(self.kalsim, _M)
-        self.kalman.S = np.eye(self.kalman.size_s)  # Initial covariance estimate.
-        self.kalman.R = np.eye(self.kalman.size_o) * 0.2  # Estimated error in measurements.
+        self.kalman.S = np.eye(self.kalman.size_s) * 0.2 # Initial covariance estimate.
+        self.kalman.R = np.eye(self.kalman.size_o) * 0.2 # Estimated error in measurements.
         self.kalman.Q = np.eye(self.kalman.size_s) * 0.  # Estimated error in process.
+
+    def GetWindow(self):
+        # _M = np.eye(self.kalsim.size)
+        size_o = (self.kalsim.grid.nx/2) * (self.kalsim.grid.ny/2)
+        M = np.zeros([size_o, self.kalsim.size])
+        k=0
+        for i in range(self.kalsim.grid.nx/4,3*self.kalsim.grid.nx/4):
+                for j in range(self.kalsim.grid.ny/4,3*self.kalsim.grid.ny/4):
+                        M[k][j + i * self.kalsim.grid.ny] = 1.
+                        k += 1
+        return M
 
     def SetMes(self, field):
         self.kalman.Y = self.kalman.M.dot(np.reshape(field, self.kalman.size_s))

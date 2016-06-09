@@ -63,6 +63,8 @@ class Simulation:
     # --------------------------------PARAMETERS--------------------------------
     power = 100
     dir = 45
+    g = 9.81
+    frot = 0.01
 
     # ---------------------------------METHODS-----------------------------------
     def __init__(self, _Tfin, _It, _noiselevel):
@@ -71,15 +73,22 @@ class Simulation:
         self.It = _It
         self.dt = _Tfin/_It
         self.field = np.zeros([_It, 4])
-        self.Mat = np.array([[1, self.dt, 0, 0],
-                             [0,  1, 0,  0],
-                             [0,  0, 1, self.dt],
-                             [0,  0, 0,  1]])
+        c0 = (2.+self.frot*self.dt)
+        c1 = (2.+self.frot*self.dt)/c0
+        c2 = (2.*self.dt)/c0
+        c3 = self.dt*self.dt / c0
+        c4 = 1.+self.frot*self.dt
+        c5 = 1./c4
+        c6 = self.dt/c4
+        self.Mat = np.array([[c1, c2, 0, 0],
+                             [0,  c5, 0,  0],
+                             [0,  0, c1, c2],
+                             [0,  0, 0,  c5]])
         self.source_term = np.array([0,
                                      0,
-                                     -0.5 * 9.81 * self.dt * self.dt,
-                                     -9.81 * self.dt])
-
+                                     -c3*self.g,
+                                     -c6*self.g])
+                                     
     def GetSol(self):         # Get current Solution
         return self.field
 
@@ -99,7 +108,7 @@ class KalmanWrapper:
                        [0, 0, 1, 0]])  # Observation matrix.
 
         self.kalman = KalmanFilter(self.kalsim, _M)
-        self.kalman.S = np.eye(self.kalman.size_s)  # Initial covariance estimate.
+        self.kalman.S = np.eye(self.kalman.size_s) * 0.2 # Initial covariance estimate.
         self.kalman.R = np.eye(self.kalman.size_o) * 0.2  # Estimated error in measurements.
         self.kalman.Q = np.eye(self.kalman.size_s) * 0.  # Estimated error in process.
 
@@ -123,7 +132,7 @@ class KalmanWrapper:
 class Drop:
     Tfin = 20.
     Iterations = 200
-    noiselevel = 50
+    noiselevel = 50.
 
     def __init__(self):
         self.reality = Reality(self.Tfin, self.Iterations, self.noiselevel)
@@ -190,7 +199,7 @@ print "Norme H1 de la mesure", Err_mes
 # ------------------------ Compute simulation without Kalman ----------------------------
 
 # Bad initial solution
-edp.simulation.SetSol(Sol_ref[0, :])
+edp.simulation.SetSol(Sol_mes[0, :])
 
 for it in edp.Compute(edp.simulation):
     Sol_sim[it, :] = edp.simulation.GetSol()
@@ -202,7 +211,7 @@ print "Norme H1 de la simu", Err_sim
 # ------------------------ Compute simulation with Kalman ----------------------------
 
 # Bad initial solution
-edp.kalsim.SetSol(Sol_ref[0, :])
+edp.kalsim.SetSol(Sol_mes[0, :])
 edp.kalman.SetMes(Sol_mes[1, :])
 
 it = 0
