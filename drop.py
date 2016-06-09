@@ -11,6 +11,7 @@ class Reality:
     g = - 9.81
     power = 100.
     dir = 45.
+    frot = 0.01
 
     # ---------------------------------METHODS-----------------------------------
     def __init__(self, _Tfin, _It, _noiselevel):
@@ -36,10 +37,25 @@ class Reality:
     def Compute(self):
         for i in range(self.It):
             time = i * self.dt
-            self.field[0] = self.init[0] + self.init[1] * time
-            self.field[1] = self.init[1]
-            self.field[2] = self.init[2] + self.init[3] * time + 0.5 * self.g * time * time
-            self.field[3] = self.init[3] + self.g * time
+            # avec frottement
+            c1 = 0.
+            c2 = self.init[1] + c1
+            c3 = math.exp(-self.frot * time)
+            c4 = self.init[0] + c2/self.frot
+            self.field[0] = c4 - c2/self.frot * c3 - c1 * time
+            self.field[1] = c2 * math.exp(-self.frot * time) - c1
+            c1 = - self.g / self.frot
+            c2 = self.init[3] + c1
+            c4 = self.init[2] + c2/self.frot
+            self.field[2] = c4 - c2/self.frot * c3 - c1 * time
+            self.field[3] = c2 * math.exp(-self.frot * time) - c1
+
+            # sans frottement
+            # self.field[0] = self.init[0] + self.init[1] * time
+            # self.field[1] = self.init[1]
+            # self.field[2] = self.init[2] + self.init[3] * time + 0.5 * self.g * time * time
+            # self.field[3] = self.init[3] + self.g * time
+
             yield i
 
 
@@ -174,7 +190,7 @@ print "Norme H1 de la mesure", Err_mes
 # ------------------------ Compute simulation without Kalman ----------------------------
 
 # Bad initial solution
-edp.simulation.SetSol(Sol_mes[0, :])
+edp.simulation.SetSol(Sol_ref[0, :])
 
 for it in edp.Compute(edp.simulation):
     Sol_sim[it, :] = edp.simulation.GetSol()
@@ -186,7 +202,7 @@ print "Norme H1 de la simu", Err_sim
 # ------------------------ Compute simulation with Kalman ----------------------------
 
 # Bad initial solution
-edp.kalsim.SetSol(Sol_mes[0, :])
+edp.kalsim.SetSol(Sol_ref[0, :])
 edp.kalman.SetMes(Sol_mes[1, :])
 
 it = 0
