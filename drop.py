@@ -30,7 +30,6 @@ class Reality(SkelReality):
     # ---------------------------------METHODS-----------------------------------
     def __init__(self, _tfin, _it, _noiselevel):
         SkelReality.__init__(self, _noiselevel)
-        self.noiselevel = _noiselevel
         self.Tfin = _tfin
         self.It = _it
         self.dt = _tfin / _it
@@ -76,8 +75,8 @@ class Simulation(SkelSimulation):
     # --------------------------------PARAMETERS--------------------------------
     power = 100
     dir = 45
-    g = 9.81 + 1.
-    frot = 0.1 - 0.01
+    g = 9.81 #+ 1.
+    frot = 0.1 # - 0.01
 
     # ---------------------------------METHODS-----------------------------------
     def __init__(self, _tfin, _it):
@@ -107,16 +106,16 @@ class Simulation(SkelSimulation):
         c5 = 1. - self.frot * self.dt
         c6 = self.dt
         c1 = 1.
-        c2 = self.dt * c5
+        c2 = self.dt
         c3 = self.dt * c6
 
         self.Mat = np.array([[c1, c2, 0, 0],
                              [0, c5, 0, 0],
                              [0, 0, c1, c2],
                              [0, 0, 0, c5]])
-        self.rhs = np.array([0,
-                             0,
-                             -c3 * self.g,
+        self.rhs = np.array([0.,
+                             0.,
+                             0.,
                              -c6 * self.g])
 
 
@@ -130,10 +129,18 @@ class KalmanWrapper(SkelKalmanWrapper):
         _M = np.array([[1, 0, 0, 0],
                        [0, 0, 1, 0]])  # Observation matrix.
 
+        # _M = np.eye(4)  # Observation matrix.
+
         self.kalman = KalmanFilter(self.kalsim, _M)
         self.kalman.S = np.eye(self.kalman.size_s) * 0.2  # Initial covariance estimate.
         self.kalman.R = np.eye(self.kalman.size_o) * 0.2  # Estimated error in measurements.
-        self.kalman.Q = np.eye(self.kalman.size_s) * 0.  # Estimated error in process.
+
+        G = np.array([_sim.dt**2 / 2.,
+                      _sim.dt,
+                      _sim.dt**2 / 2.,
+                      _sim.dt])  # Estimated error in process.
+        self.kalman.Q = G.dot(np.transpose(G))
+        # self.kalman.Q = np.eye(self.kalman.size_s) * 0.  # Estimated error in process.
 
     def setmes(self, field):
         """
@@ -268,6 +275,7 @@ for it in edp.compute(edp.simulation):
 
 Err_sim = edp.norm(Sol_ref - Sol_sim) / Norm_ref
 print("Norme H1 de la simu", Err_sim)
+
 # edp.plot(Sol_sim)
 
 # ------------------------ Compute simulation with Kalman ----------------------------

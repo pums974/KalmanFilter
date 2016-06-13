@@ -287,20 +287,47 @@ class KalmanWrapper(SkelKalmanWrapper):
     err = 999
 
     def __init__(self, _reality, _sim):
+
+        def indx(_i, _j):
+            """
+                Swith from coordinate to line number in the matrix
+            :param _i: x coordinate
+            :param _j: y coordinate
+            :return: line number
+            """
+            return _j + _i * self.kalsim.grid.ny
+
         SkelKalmanWrapper.__init__(self, _reality, _sim)
         self.size = self.kalsim.size
         _M = self.getwindow()  # Observation matrix.
         self.kalman = KalmanFilter(self.kalsim, _M)
         self.kalman.S = np.eye(self.kalman.size_s) * 0.2  # Initial covariance estimate.
         self.kalman.R = np.eye(self.kalman.size_o) * 0.2  # Estimated error in measurements.
-        self.kalman.Q = np.eye(self.kalman.size_s) * 0.  # Estimated error in process.
+
+        G = np.zeros(self.kalman.size_s)
+        for i in range(self.kalsim.grid.nx):
+            for j in range(self.kalsim.grid.ny):
+                G[indx(i, j)] = self.kalsim.grid.dx ** 3 / 6. \
+                              + self.kalsim.grid.dy ** 3 / 6. \
+                              + self.kalsim.dt ** 2 / 2.
+
+        self.kalman.Q = G.dot(np.transpose(G))
+        # self.kalman.Q = np.eye(self.kalman.size_s) * 0.  # Estimated error in process.
 
     def getwindow(self):
         """
             Produce the observation matrix : designate what we conserve of the noisy field
         :return: observation matrix
         """
-        M = np.eye(self.kalsim.size)
+        def indx(_i, _j):
+            """
+                Swith from coordinate to line number in the matrix
+            :param _i: x coordinate
+            :param _j: y coordinate
+            :return: line number
+            """
+            return _j + _i * self.kalsim.grid.ny
+        # M = np.eye(self.kalsim.size)
         # size_o = (self.kalsim.grid.nx - 4) * (self.kalsim.grid.ny - 4)
         # M = np.zeros([size_o, self.kalsim.size])
         # k = 0
@@ -308,6 +335,26 @@ class KalmanWrapper(SkelKalmanWrapper):
         #     for j in range(2, self.kalsim.grid.ny - 2):
         #         M[k][j + i * self.kalsim.grid.ny] = 1.
         #         k += 1
+        ep = 1
+        size_o = 2. * ep * self.kalsim.grid.nx + 2. * ep * (self.kalsim.grid.ny - 2 * ep)
+        M = np.zeros([size_o, self.kalsim.size])
+        k = 0
+        for i in range(self.kalsim.grid.nx):
+            for j in range(0, ep):
+                M[k][indx(i, j)] = 1.
+                k += 1
+            for j in range(self.kalsim.grid.ny - ep, self.kalsim.grid.ny):
+                M[k][indx(i, j)] = 1.
+                k += 1
+        for j in range(ep, self.kalsim.grid.ny - ep):
+            for i in range(0, ep):
+                M[k][indx(i, j)] = 1.
+                k += 1
+            for i in range(self.kalsim.grid.nx - ep, self.kalsim.grid.nx):
+                M[k][indx(i, j)] = 1.
+                k += 1
+
+        print(M)
         return M
 
     @property
