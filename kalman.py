@@ -1,14 +1,15 @@
 #!/usr/bin/python2
-
-import math
-import random
+# coding=utf-8
+"""
+    This is our implementation of the Kalman filter
+"""
 import numpy as np
-import time
-import matplotlib.pyplot as plt
 
 
-# Implements a linear Kalman filter.
-class KalmanFilter:
+class KalmanFilter(object):
+    """
+        This contains everything for our Kalman filter independently of the test case
+    """
     def __init__(self, _simulation, _M):
         self.simulation = _simulation
         self.size_s = _simulation.Mat.shape[0]
@@ -17,7 +18,7 @@ class KalmanFilter:
         self.M = np.zeros([self.size_o, self.size_s])
 
         self.Phi = _simulation.Mat  # State transition matrix.
-        self.M = _M                 # Observation matrix.
+        self.M = _M  # Observation matrix.
         self.R = np.zeros([self.size_o, self.size_o])  # Estimated error in measurements.
         self.Q = np.zeros([self.size_s, self.size_s])  # Estimated error in process.
         self.S = np.zeros([self.size_s, self.size_s])  # Initial covariance estimate.
@@ -25,7 +26,10 @@ class KalmanFilter:
         self.Y = np.zeros(self.size_o)
         self.Id = np.eye(self.size_s)
 
-    def Apply(self):
+    def apply(self):
+        """
+            apply the kalman filter
+        """
         # -------------------------Prediction step-----------------------------
         self.S = self.Phi.dot(self.S).dot(np.transpose(self.Phi)) + self.Q
 
