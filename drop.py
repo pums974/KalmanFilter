@@ -11,7 +11,6 @@
 
 from __future__ import print_function
 import math
-import random
 import numpy as np
 import matplotlib.pyplot as plt
 from kalman import KalmanFilter
@@ -30,6 +29,7 @@ class Reality(SkelReality):
 
     # ---------------------------------METHODS-----------------------------------
     def __init__(self, _tfin, _it, _noiselevel):
+        SkelReality.__init__(self, _noiselevel)
         self.noiselevel = _noiselevel
         self.Tfin = _tfin
         self.It = _it
@@ -39,17 +39,6 @@ class Reality(SkelReality):
                               self.power * math.cos(self.dir * math.pi / 180.),
                               0.,
                               self.power * math.sin(self.dir * math.pi / 180.)])
-
-    @property
-    def getsolwithnoise(self):
-        """
-            Get a noisy field around the analytical solution
-        :return: a noisy field
-        """
-        field_with_noise = np.zeros([4])
-        for i in range(4):
-            field_with_noise[i] = random.gauss(self.field[i], self.noiselevel)
-        return field_with_noise
 
     @property
     def compute(self):
@@ -91,8 +80,8 @@ class Simulation(SkelSimulation):
     frot = 0.1 - 0.01
 
     # ---------------------------------METHODS-----------------------------------
-    def __init__(self, _tfin, _it, _noiselevel):
-        self.noiselevel = _noiselevel
+    def __init__(self, _tfin, _it):
+        SkelSimulation.__init__(self)
         self.Tfin = _tfin
         self.It = _it
         self.dt = _tfin / _it
@@ -125,18 +114,18 @@ class Simulation(SkelSimulation):
                              [0, c5, 0, 0],
                              [0, 0, c1, c2],
                              [0, 0, 0, c5]])
-        self.source_term = np.array([0,
-                                     0,
-                                     -c3 * self.g,
-                                     -c6 * self.g])
+        self.rhs = np.array([0,
+                             0,
+                             -c3 * self.g,
+                             -c6 * self.g])
+
 
 class KalmanWrapper(SkelKalmanWrapper):
     """
         This class is use around the simulation to apply the kalman filter
     """
     def __init__(self, _reality, _sim):
-        self.reality = _reality
-        self.kalsim = _sim
+        SkelKalmanWrapper.__init__(self, _reality, _sim)
         self.It = _sim.It
         _M = np.array([[1, 0, 0, 0],
                        [0, 0, 1, 0]])  # Observation matrix.
@@ -192,9 +181,10 @@ class Drop(EDP):
     noiselevel = 20.
 
     def __init__(self):
+        EDP.__init__(self)
         self.reality = Reality(self.Tfin, self.Iterations, self.noiselevel)
-        self.simulation = Simulation(self.Tfin, self.Iterations, self.noiselevel)
-        self.kalsim = Simulation(self.Tfin, self.Iterations, self.noiselevel)
+        self.simulation = Simulation(self.Tfin, self.Iterations)
+        self.kalsim = Simulation(self.Tfin, self.Iterations)
         self.kalman = KalmanWrapper(self.reality, self.kalsim)
 
     def compute(self, simu):
@@ -207,15 +197,6 @@ class Drop(EDP):
             if i > 0:
                 simu.step()
             yield i
-
-    @staticmethod
-    def norm(field):
-        """
-            compute the L2 norm of the obtained trajectory
-        :param field:
-        :return:
-        """
-        return np.sqrt(np.sum(np.square(field)))
 
     @staticmethod
     def plot(field):

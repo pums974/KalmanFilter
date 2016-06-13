@@ -13,7 +13,6 @@
     * one animation of the filtered simulation during time convergence
 """
 from __future__ import print_function
-import random
 import matplotlib.pyplot as plt
 import numpy as np
 from matplotlib import animation
@@ -22,6 +21,7 @@ from mpl_toolkits.mplot3d import Axes3D
 
 from kalman import KalmanFilter
 from skeleton import *
+
 
 class Grid(object):
     """
@@ -183,22 +183,10 @@ class Reality(SkelReality):
     # ---------------------------------METHODS-----------------------------------
 
     def __init__(self, _grid, _source_term, _noiselevel):
+        SkelReality.__init__(self, _noiselevel)
         self.source_term = _source_term
-        self.noiselevel = _noiselevel
         self.grid = _grid
         self.field = np.zeros([self.grid.nx, self.grid.ny])
-
-    @property
-    def getsolwithnoise(self):
-        """
-            Get a noisy field around the analytical solution
-        :return: a noisy field
-        """
-        field_with_noise = np.zeros([self.grid.nx, self.grid.ny])
-        for i in range(self.grid.nx):
-            for j in range(self.grid.ny):
-                field_with_noise[i][j] = random.gauss(self.field[i][j], self.noiselevel)
-        return field_with_noise
 
     def compute(self):
         """
@@ -223,6 +211,8 @@ class Simulation(SkelSimulation):
 
     # ---------------------------------METHODS-----------------------------------
     def __init__(self, _grid, _source_term):
+        SkelSimulation.__init__(self)
+
         def indx(_i, _j):
             """
                 Swith from coordinate to line number in the matrix
@@ -232,7 +222,7 @@ class Simulation(SkelSimulation):
             """
             return _j + _i * ny
 
-        self.source_term = _source_term
+        self.rhs = _source_term
         self.grid = _grid
         nx = _grid.nx
         ny = _grid.ny
@@ -253,7 +243,7 @@ class Simulation(SkelSimulation):
                 self.Mat[indx(i, j)] += np.reshape(self.grid.dderx(self.field), [self.size])
                 self.Mat[indx(i, j)] += np.reshape(self.grid.ddery(self.field), [self.size])
         # rhs and boundary conditions
-        self.rhs = np.zeros([self.size]) + self.source_term * self.dt
+        self.rhs = np.zeros([self.size]) + self.rhs * self.dt
         self.Mat = self.Mat.transpose()
         for j in range(ny):
             self.Mat[indx(0, j)] = np.zeros([self.size])
@@ -287,12 +277,6 @@ class Simulation(SkelSimulation):
         """
         self.field = np.reshape(field, [self.size])
 
-    def step(self):
-        """
-            Increment through the next time step of the simulation.
-        """
-        self.field = self.Mat.dot(self.field) + self.rhs
-
 
 class KalmanWrapper(SkelKalmanWrapper):
     """
@@ -303,8 +287,7 @@ class KalmanWrapper(SkelKalmanWrapper):
     err = 999
 
     def __init__(self, _reality, _sim):
-        self.reality = _reality
-        self.kalsim = _sim
+        SkelKalmanWrapper.__init__(self, _reality, _sim)
         self.size = self.kalsim.size
         _M = self.getwindow()  # Observation matrix.
         self.kalman = KalmanFilter(self.kalsim, _M)
@@ -326,13 +309,6 @@ class KalmanWrapper(SkelKalmanWrapper):
         #         M[k][j + i * self.kalsim.grid.ny] = 1.
         #         k += 1
         return M
-
-    def setmes(self, field):
-        """
-            Reshape noisy field and gives it to the kalman filter
-        :param field: noisy field
-        """
-        self.kalman.Y = self.kalman.M.dot(np.reshape(field, self.kalman.size_s))
 
     @property
     def getsol(self):
@@ -377,13 +353,14 @@ class Chaleur(EDP):
     noiselevel = .2
 
     def __init__(self):
+        EDP.__init__(self)
         self.grid = Grid(self.nx, self.ny, self.Lx, self.Ly)
         self.reality = Reality(self.grid, self.source_term, self.noiselevel)
         self.simulation = Simulation(self.grid, self.source_term)
         self.kalsim = Simulation(self.grid, self.source_term)
         self.kalman = KalmanWrapper(self.reality, self.kalsim)
 
-    def compute(self,simu):
+    def compute(self, simu):
         """
             Generator : each call produce a time step the a simulation
         :param simu: the simulation to perform (filtered or not)
@@ -395,11 +372,11 @@ class Chaleur(EDP):
             oldfield = simu.getsol
             simu.step()
             newfield = simu.getsol
-            simu.conv = self.norml2(oldfield - newfield)
-            simu.err = self.normh1(simu.getsol - self.reality.getsol)
+            simu.conv = self.norm_l2(oldfield - newfield)
+            simu.err = self.norm(simu.getsol - self.reality.getsol)
             yield i
 
-    def normh1(self, field):
+    def norm(self, field):
         """
             Compute the H1 norm of the field
         :param field: field
@@ -407,7 +384,7 @@ class Chaleur(EDP):
         """
         return self.grid.norm_h1(field)
 
-    def norml2(self, field):
+    def norm_l2(self, field):
         """
             Compute the L2 nor of the field
         :param field: field
@@ -471,10 +448,10 @@ edp.reality.compute()
 Sol_ref = edp.reality.getsol
 Sol_mes = edp.reality.getsolwithnoise
 
-Norm_ref = edp.normh1(Sol_ref)
+Norm_ref = edp.norm(Sol_ref)
 edp.plot(Sol_ref)
 
-Err_mes = edp.normh1(Sol_ref - Sol_mes) / Norm_ref
+Err_mes = edp.norm(Sol_ref - Sol_mes) / Norm_ref
 print("Norme H1 de la mesure", Err_mes)
 edp.plot(Sol_mes)
 
@@ -491,7 +468,7 @@ if False:
 else:
     edp.animate(edp.simulation)
     Sol_sim = edp.simulation.getsol
-Err_sim = edp.normh1(Sol_ref - Sol_sim) / Norm_ref
+Err_sim = edp.norm(Sol_ref - Sol_sim) / Norm_ref
 print("Norme H1 de la simu", Err_sim)
 
 # ------------------------ Compute simulation with Kalman ----------------------------
@@ -507,5 +484,5 @@ if False:
 else:
     edp.animate(edp.kalman)
     Sol_kal = edp.kalman.getsol
-Err_kal = edp.normh1(Sol_ref - Sol_kal) / Norm_ref
+Err_kal = edp.norm(Sol_ref - Sol_kal) / Norm_ref
 print("Norme H1 de la simu filtre", Err_kal)

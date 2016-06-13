@@ -32,9 +32,11 @@ class SkelReality(object):
             Get a noisy field around the analytical solution
         :return: a noisy field
         """
-        field_with_noise = np.zeros(self.field.shape)
+        # field_with_noise = np.zeros(self.field.shape)
         # for i in range(self.field.shape):
         #     field_with_noise[i] = random.gauss(self.field[i], self.noiselevel)
+        field_with_noise = np.array([random.gauss(d, self.noiselevel)
+                                     for d in self.field.flat]).reshape(self.field.shape)
         return field_with_noise
 
     @property
@@ -53,7 +55,7 @@ class SkelSimulation(object):
     def __init__(self):
         self.field = np.zeros([0])
         self.Mat = np.array([[]])
-        self.source_term = np.array([])
+        self.rhs = np.array([])
 
     def getsol(self):
         """
@@ -73,7 +75,7 @@ class SkelSimulation(object):
         """
             Increment through the next time step of the simulation.
         """
-        self.field = self.Mat.dot(self.field) + self.source_term
+        self.field = self.Mat.dot(self.field) + self.rhs
 
 
 class SkelKalmanWrapper(object):
@@ -94,7 +96,7 @@ class SkelKalmanWrapper(object):
             Reshape noisy field and gives it to the kalman filter
         :param field:
         """
-        self.kalman.Y = self.kalman.M.dot(field)
+        self.kalman.Y = self.kalman.M.dot(np.reshape(field, self.kalman.size_s))
 
     @property
     def getsol(self):
@@ -147,8 +149,7 @@ class EDP(object):
         """
         pass
 
-    @staticmethod
-    def norm(field):
+    def norm(self, field):
         """
             compute the L2 norm of the obtained trajectory
         :param field:
