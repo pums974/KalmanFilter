@@ -75,8 +75,8 @@ class Simulation(SkelSimulation):
     # --------------------------------PARAMETERS--------------------------------
     power = 100
     dir = 45
-    g = 9.81 #+ 1.
-    frot = 0.1 # - 0.01
+    g = 9.81
+    frot = 0.1
 
     # ---------------------------------METHODS-----------------------------------
     def __init__(self, _tfin, _it):
@@ -107,7 +107,6 @@ class Simulation(SkelSimulation):
         c6 = self.dt
         c1 = 1.
         c2 = self.dt
-        c3 = self.dt * c6
 
         self.Mat = np.array([[c1, c2, 0, 0],
                              [0, c5, 0, 0],
@@ -135,10 +134,10 @@ class KalmanWrapper(SkelKalmanWrapper):
         self.kalman.S = np.eye(self.kalman.size_s) * 0.2  # Initial covariance estimate.
         self.kalman.R = np.eye(self.kalman.size_o) * 0.2  # Estimated error in measurements.
 
-        G = np.array([_sim.dt**2 / 2.,
+        G = np.array([[_sim.dt**2 / 2.,
                       _sim.dt,
                       _sim.dt**2 / 2.,
-                      _sim.dt])  # Estimated error in process.
+                      _sim.dt]])  # Estimated error in process.
         self.kalman.Q = G.dot(np.transpose(G))
         # self.kalman.Q = np.eye(self.kalman.size_s) * 0.  # Estimated error in process.
 
