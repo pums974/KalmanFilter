@@ -17,6 +17,7 @@ class SkelReality(object):
     def __init__(self, _noiselevel):
         self.noiselevel = _noiselevel
         self.field = np.zeros([0])
+        self.addnoisev = np.vectorize(self.addnoise)
 
     @property
     def getsol(self):
@@ -26,7 +27,9 @@ class SkelReality(object):
         """
         return self.field
 
-    @property
+    def addnoise(self, value):
+        return random.gauss(value, self.noiselevel)
+
     def getsolwithnoise(self):
         """
             Get a noisy field around the analytical solution
@@ -35,16 +38,15 @@ class SkelReality(object):
         # field_with_noise = np.zeros(self.field.shape)
         # for i in range(self.field.shape):
         #     field_with_noise[i] = random.gauss(self.field[i], self.noiselevel)
-        field_with_noise = np.array([random.gauss(d, self.noiselevel)
-                                     for d in self.field.flat]).reshape(self.field.shape)
-        return field_with_noise
+        # field_with_noise = np.array([random.gauss(d, self.noiselevel)
+        #                              for d in self.field.flat]).reshape(self.field.shape)
+        return self.addnoisev(self.field)
 
-    @property
     def compute(self):
         """
-            Generator : each call gives you next step of the analytical solution
+            Compute the analytical solution
         """
-        yield 0
+        pass
 
 
 class SkelSimulation(object):
@@ -156,3 +158,12 @@ class EDP(object):
         :return:
         """
         return np.sqrt(np.sum(np.square(field)))
+
+    def run_test_case(self, graphs):
+        """
+            Run the test case
+        :return:
+        """
+        self.reality.compute()
+        self.compute(self.simulation)
+        self.compute(self.kalman)

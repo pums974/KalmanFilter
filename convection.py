@@ -49,14 +49,11 @@ class Reality(SkelReality):
         self.field = np.zeros([self.grid.nx, self.grid.ny])
         self.It += 1
         t = self.It * self.dt
-        x0 = self.grid.Lx * math.cos(t * self.dtheta / 2.) / 4.
-        y0 = self.grid.Lx * math.sin(t * self.dtheta / 2.) / 4.
-        for i in range(self.grid.nx):
-            for j in range(self.grid.ny):
-                dist = math.sqrt((self.grid.coordx[i][j] - x0) ** 2 +
-                                 (self.grid.coordy[i][j] - y0) ** 2)
-                # if dist < self.grid.Lx / 6.:
-                self.field[i][j] = max([1. - dist**2, 0.])
+        x0 = self.grid.Lx * math.cos(t * self.dtheta * 0.5) * 0.25
+        y0 = self.grid.Lx * math.sin(t * self.dtheta * 0.5) * 0.25
+        tmp1 = np.square(self.grid.coordx - x0)
+        tmp2 = np.square(self.grid.coordy - y0)
+        self.field = np.maximum(1. - tmp1 - tmp2, self.field)
 
     def reinit(self):
         """
@@ -166,14 +163,14 @@ class KalmanWrapper(SkelKalmanWrapper):
         self.kalman.S = np.eye(self.kalman.size_s) * 0.2  # Initial covariance estimate.
         self.kalman.R = np.eye(self.kalman.size_o) * 0.2  # Estimated error in measurements.
 
-        G = np.zeros([self.kalman.size_s, 1])
-        for i in range(self.kalsim.grid.nx):
-            for j in range(self.kalsim.grid.ny):
-                G[indx(i, j)] = self.kalsim.grid.dx ** 2 / 2. \
-                                + self.kalsim.grid.dy ** 2 / 2. \
-                                + self.kalsim.dt ** 2 / 2.
-        self.kalman.Q = G.dot(np.transpose(G))
-        # self.kalman.Q = np.eye(self.kalman.size_s) * 0.  # Estimated error in process.
+        # G = np.zeros([self.kalman.size_s, 1])
+        # for i in range(self.kalsim.grid.nx):
+        #     for j in range(self.kalsim.grid.ny):
+        #         G[indx(i, j)] = self.kalsim.grid.dx ** 2 / 2. \
+        #                         + self.kalsim.grid.dy ** 2 / 2. \
+        #                         + self.kalsim.dt ** 2 / 2.
+        # self.kalman.Q = G.dot(np.transpose(G))
+        self.kalman.Q = np.eye(self.kalman.size_s) * 0.  # Estimated error in process.
 
     def getwindow(self):
         """
@@ -214,10 +211,11 @@ class KalmanWrapper(SkelKalmanWrapper):
             Compute the next step of the simulation and apply kalman filter to the result
         """
         self.kalsim.step()
-        self.setsol(self.kalsim.getsol)
-        self.setmes(self.reality.getsolwithnoise)
-        self.kalman.apply()
-        self.kalsim.setsol(self.getsol)
+        # self.setsol(self.kalsim.getsol)
+        # self.setmes(self.reality.getsolwithnoise())
+        # self.kalman.apply()
+        # self.kalsim.setsol(self.getsol)
+        self.setsol(self.reality.getsol)
 
 
 class Convection(EDP):
@@ -342,9 +340,9 @@ class Convection(EDP):
             :return: surface to be plotted
             """
             ax.clear()
-            surf = ax.plot_surface(self.grid.coordx, self.grid.coordy, simu.getsolwithnoise, rstride=1,
+            surf = ax.plot_surface(self.grid.coordx, self.grid.coordy, simu.getsolwithnoise(), rstride=1,
                                    cstride=1, cmap=cm.coolwarm, linewidth=0, antialiased=False)
-            simu.err = self.norm(simu.getsol - simu.getsolwithnoise)
+            simu.err = self.norm(simu.getsol - simu.getsolwithnoise())
             ax.set_xlim(-1, 1)
             ax.set_ylim(-1, 1)
             ax.set_zlim(-1, 1)
@@ -361,46 +359,59 @@ class Convection(EDP):
                                     repeat=False)
         plt.show()
 
-# ------------------------ Begin program ----------------------------
+    def run_test_case(self, graphs):
+        """
+            Run the test case
+        :return:
+        """
+        # ----------------- Compute reality and measurement --------------------
+        if graphs :
+            self.animate(self.reality)
+        else:
+            for it in self.compute(self.reality):
+                pass
+        Sol_ref = self.reality.getsol
+        if graphs:
+            self.animatewithnoise(self.reality)
+        Sol_mes = self.reality.getsolwithnoise()
 
-edp = Convection()
+        Norm_ref = self.norm(Sol_ref)
+        # edp.plot(Sol_ref)
 
-# ----------------- Compute reality and measurement --------------------
-edp.animate(edp.reality)
-Sol_ref = edp.reality.getsol
-edp.animatewithnoise(edp.reality)
-Sol_mes = edp.reality.getsolwithnoise
+        Err_mes = self.norm(Sol_ref - Sol_mes) / Norm_ref
+        print("Erreur H1 de la mesure", Err_mes)
+        # edp.plot(Sol_mes)
 
-Norm_ref = edp.norm(Sol_ref)
-# edp.plot(Sol_ref)
+        # ------------------------ Compute simulation without Kalman ----------------------------
+        print("Simulation sans Kalman...")
+        self.reality.reinit()
+        # Bad initial solution and boundary condition
+        self.simulation.setsol(self.reality.getsolwithnoise())
+        if graphs:
+            self.animate(self.simulation)
+        else:
+            for it in self.compute(self.simulation):
+                pass
+        Sol_sim = self.simulation.getsol
+        Err_sim = self.norm(Sol_ref - Sol_sim) / Norm_ref
+        print("Erreur H1 de la simu", Err_sim)
 
-Err_mes = edp.norm(Sol_ref - Sol_mes) / Norm_ref
-print("Erreur H1 de la mesure", Err_mes)
-# edp.plot(Sol_mes)
+        # ------------------------ Compute simulation with Kalman ----------------------------
+        print("Simulation avec Kalman...")
+        self.reality.reinit()
+        # Bad initial solution
+        self.kalman.setsol(self.reality.getsolwithnoise())
 
-# ------------------------ Compute simulation without Kalman ----------------------------
-print("Simulation sans Kalman...")
-edp.reality.reinit()
-# Bad initial solution and boundary condition
-edp.simulation.setsol(edp.reality.getsolwithnoise)
+        if graphs:
+            self.animate(self.kalman)
+        else:
+            for it in self.compute(self.kalman):
+                pass
+        Sol_kal = self.kalman.getsol
+        Err_kal = self.norm(Sol_ref - Sol_kal) / Norm_ref
+        print("Erreur H1 de la simu filtre", Err_kal)
 
-edp.animate(edp.simulation)
-Sol_sim = edp.simulation.getsol
-Err_sim = edp.norm(Sol_ref - Sol_sim) / Norm_ref
-print("Erreur H1 de la simu", Err_sim)
-
-# ------------------------ Compute simulation with Kalman ----------------------------
-print("Simulation avec Kalman...")
-edp.reality.reinit()
-# Bad initial solution
-edp.kalman.setsol(edp.reality.getsolwithnoise)
-
-edp.animate(edp.kalman)
-Sol_kal = edp.kalman.getsol
-Err_kal = edp.norm(Sol_ref - Sol_kal) / Norm_ref
-print("Erreur H1 de la simu filtre", Err_kal)
-
-print("Max de la solution de référence", np.max(Sol_ref))
-print("Max de la solution simulé", np.max(Sol_sim))
-print("Max de la solution simulé avec filtre", np.max(Sol_kal))
+        print("Max de la solution de référence", np.max(Sol_ref))
+        print("Max de la solution simulé", np.max(Sol_sim))
+        print("Max de la solution simulé avec filtre", np.max(Sol_kal))
 

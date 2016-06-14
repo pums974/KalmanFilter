@@ -185,7 +185,7 @@ class KalmanWrapper(SkelKalmanWrapper):
         #         M[k][j + i * self.kalsim.grid.ny] = 1.
         #         k += 1
         ep = 1
-        size_o = 2. * ep * self.kalsim.grid.nx + 2. * ep * (self.kalsim.grid.ny - 2 * ep)
+        size_o = 2 * ep * self.kalsim.grid.nx + 2 * ep * (self.kalsim.grid.ny - 2 * ep)
         M = np.zeros([size_o, self.kalsim.size])
         k = 0
         for i in range(self.kalsim.grid.nx):
@@ -226,7 +226,7 @@ class KalmanWrapper(SkelKalmanWrapper):
         """
         self.kalsim.step()
         self.setsol(self.kalsim.getsol)
-        self.setmes(self.reality.getsolwithnoise)
+        self.setmes(self.reality.getsolwithnoise())
         self.kalman.apply()
         self.kalsim.setsol(self.getsol)
 
@@ -267,7 +267,7 @@ class Chaleur(EDP):
             simu.step()
             newfield = simu.getsol
             simu.conv = self.norm_l2(oldfield - newfield)
-            simu.err = self.norm(simu.getsol - self.reality.getsol)
+            simu.err = self.norm(newfield - self.reality.getsol)
             yield i
 
     def norm(self, field):
@@ -331,52 +331,50 @@ class Chaleur(EDP):
                                     repeat=False)
         plt.show()
 
+    def run_test_case(self, graphs):
+        """
+            Run the test case
+        :return:
+        """
+        # ----------------- Compute reality and measurement --------------------
+        self.reality.compute()
 
-# ------------------------ Begin program ----------------------------
+        Sol_ref = self.reality.getsol
+        Sol_mes = self.reality.getsolwithnoise()
 
-edp = Chaleur()
+        Norm_ref = self.norm(Sol_ref)
+        if graphs:
+            self.plot(Sol_ref)
 
-# ----------------- Compute reality and measurement --------------------
-edp.reality.compute()
+        Err_mes = self.norm(Sol_ref - Sol_mes) / Norm_ref
+        print("Norme H1 de la mesure", Err_mes)
+        if graphs:
+            self.plot(Sol_mes)
 
-Sol_ref = edp.reality.getsol
-Sol_mes = edp.reality.getsolwithnoise
+        # ------------------------ Compute simulation without Kalman ----------------------------
+        print("Simulation sans Kalman...")
+        # Bad initial solution and boundary condition
+        self.simulation.setsol(self.reality.getsolwithnoise())
 
-Norm_ref = edp.norm(Sol_ref)
-edp.plot(Sol_ref)
+        if graphs:
+            self.animate(self.simulation)
+        else:
+            for it in self.compute(self.simulation):
+                pass
+        Sol_sim = self.simulation.getsol
+        Err_sim = self.norm(Sol_ref - Sol_sim) / Norm_ref
+        print("Norme H1 de la simu", Err_sim)
 
-Err_mes = edp.norm(Sol_ref - Sol_mes) / Norm_ref
-print("Norme H1 de la mesure", Err_mes)
-edp.plot(Sol_mes)
+        # ------------------------ Compute simulation with Kalman ----------------------------
+        print("Simulation avec Kalman...")
+        # Bad initial solution
+        self.kalman.setsol(self.reality.getsolwithnoise())
 
-# ------------------------ Compute simulation without Kalman ----------------------------
-print("Simulation sans Kalman...")
-# Bad initial solution and boundary condition
-edp.simulation.setsol(edp.reality.getsolwithnoise)
-
-if False:
-    for it in edp.compute(edp.simulation):
-        pass
-    Sol_sim = edp.simulation.getsol
-    edp.plot(Sol_sim)
-else:
-    edp.animate(edp.simulation)
-    Sol_sim = edp.simulation.getsol
-Err_sim = edp.norm(Sol_ref - Sol_sim) / Norm_ref
-print("Norme H1 de la simu", Err_sim)
-
-# ------------------------ Compute simulation with Kalman ----------------------------
-print("Simulation avec Kalman...")
-# Bad initial solution
-edp.kalman.setsol(edp.reality.getsolwithnoise)
-
-if False:
-    for it in edp.compute(edp.kalman):
-        pass
-    Sol_kal = edp.kalman.getsol
-    edp.plot(Sol_kal)
-else:
-    edp.animate(edp.kalman)
-    Sol_kal = edp.kalman.getsol
-Err_kal = edp.norm(Sol_ref - Sol_kal) / Norm_ref
-print("Norme H1 de la simu filtre", Err_kal)
+        if graphs:
+            self.animate(self.kalman)
+        else:
+            for it in self.compute(self.kalman):
+                pass
+        Sol_kal = self.kalman.getsol
+        Err_kal = self.norm(Sol_ref - Sol_kal) / Norm_ref
+        print("Norme H1 de la simu filtre", Err_kal)
