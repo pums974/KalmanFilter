@@ -58,6 +58,7 @@ class SkelSimulation(object):
         self.field = np.zeros([0])
         self.Mat = np.array([[]])
         self.rhs = np.array([])
+        self.It = 0
 
     def getsol(self):
         """
@@ -78,6 +79,7 @@ class SkelSimulation(object):
             Increment through the next time step of the simulation.
         """
         self.field = self.Mat.dot(self.field) + self.rhs
+        self.It += 1
 
 
 class SkelKalmanWrapper(object):
@@ -135,10 +137,10 @@ class EDP(object):
         * A filtered simulation
         * how to plot the results
     """
-    noiselevel = 20.
+    noise_real = 20.
 
     def __init__(self):
-        self.reality = SkelReality(self.noiselevel)
+        self.reality = SkelReality(self.noise_real)
         self.simulation = SkelSimulation()
         self.kalsim = SkelSimulation()
         self.kalman = SkelKalmanWrapper(self.reality, self.kalsim)

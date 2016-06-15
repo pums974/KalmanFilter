@@ -24,28 +24,37 @@
 from drop import Drop
 from chaleur import Chaleur
 from convection import Convection
-import cProfile
-import pstats
-import os
+# import cProfile
+# import pstats
+# import os
 import pprofile
 
-def test_cases():
-    # yield Drop()
-    # yield Chaleur()
-    yield Convection()
 
-graphs = True
+def test_cases():
+    yield Drop()
+    # yield Chaleur()
+    # yield Convection()
+
+
+def run():
+    for i in range(10):
+        edp.run_test_case(graphs)
+
+graphs = False
+profile = False
 
 for edp in test_cases():
-    edp.run_test_case(graphs)
-    # profiler = pprofile.Profile()
-    # with profiler:
-    #     edp.run_test_case(graphs)
-    # # profiler.print_stats()
-    # with open("profile.stat", 'w') as file:
-    #     profiler.callgrind(file)
-    # cProfile.run("edp.run_test_case(graphs)", "profile.stat")
-    # p = pstats.Stats('profile.stat')
-    # p.sort_stats('time').print_stats(10)
-    # p.sort_stats('cumulative').print_stats(10)
-    # os.remove("profile.stat")
+    if profile:
+        profiler = pprofile.Profile()
+        with profiler:
+            run()
+        profiler.print_stats()
+        with open("profile.stat", 'w') as file:
+            profiler.callgrind(file)
+        # cProfile.run("edp.run_test_case(graphs)", "profile.stat")
+        # p = pstats.Stats('profile.stat')
+        # p.sort_stats('time').print_stats(10)
+        # p.sort_stats('cumulative').print_stats(10)
+        # os.remove("profile.stat")
+    else:
+        run()

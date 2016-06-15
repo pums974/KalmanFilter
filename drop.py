@@ -15,6 +15,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from kalman import KalmanFilter
 from skeleton import *
+import random
 
 
 class Reality(SkelReality):
@@ -25,7 +26,7 @@ class Reality(SkelReality):
     g = - 9.81
     power = 100.
     dir = 45.
-    frot = 0.1
+    frot = 0.0
 
     # ---------------------------------METHODS-----------------------------------
     def __init__(self, _tfin, _it, _noiselevel):
@@ -50,26 +51,26 @@ class Reality(SkelReality):
             # This is the solution of
             # a = - g - h * v
             # x(0) = (0, 0)
-            c1 = 0.
-            c2 = self.init[1] + c1
-            c3 = math.exp(-self.frot * time)
-            c4 = self.init[0] + c2 / self.frot
-            self.field[0] = c4 - c2 / self.frot * c3 - c1 * time
-            self.field[1] = c2 * math.exp(-self.frot * time) - c1
-            c1 = - self.g / self.frot
-            c2 = self.init[3] + c1
-            c4 = self.init[2] + c2 / self.frot
-            self.field[2] = c4 - c2 / self.frot * c3 - c1 * time
-            self.field[3] = c2 * math.exp(-self.frot * time) - c1
+            # c1 = 0.
+            # c2 = self.init[1] + c1
+            # c3 = math.exp(-self.frot * time)
+            # c4 = self.init[0] + c2 / self.frot
+            # self.field[0] = c4 - c2 / self.frot * c3 - c1 * time
+            # self.field[1] = c2 * math.exp(-self.frot * time) - c1
+            # c1 = - self.g / self.frot
+            # c2 = self.init[3] + c1
+            # c4 = self.init[2] + c2 / self.frot
+            # self.field[2] = c4 - c2 / self.frot * c3 - c1 * time
+            # self.field[3] = c2 * math.exp(-self.frot * time) - c1
 
             # sans frottement
             # This is the solution of
             # a = - g
             # x(0) = (0, 0)
-            # self.field[0] = self.init[0] + self.init[1] * time
-            # self.field[1] = self.init[1]
-            # self.field[2] = self.init[2] + self.init[3] * time + 0.5 * self.g * time * time
-            # self.field[3] = self.init[3] + self.g * time
+            self.field[0] = self.init[0] + self.init[1] * time
+            self.field[1] = self.init[1]
+            self.field[2] = self.init[2] + self.init[3] * time + 0.5 * self.g * time * time
+            self.field[3] = self.init[3] + self.g * time
 
             yield i
 
@@ -82,15 +83,16 @@ class Simulation(SkelSimulation):
     power = 100
     dir = 45
     g = - 9.81
-    frot = 0.1
+    frot = 0.0
 
     # ---------------------------------METHODS-----------------------------------
-    def __init__(self, _tfin, _it):
+    def __init__(self, _tfin, _it, _noiselevel):
         SkelSimulation.__init__(self)
         self.Tfin = _tfin
         self.It = _it
         self.dt = _tfin / _it
         self.field = np.zeros([_it, 4])
+        self.noiselevel = _noiselevel
         # x_n+1 = x_n + dt * v_n + O(dt^2)
         # v_n+1 = (1 - h*dt) v_n - dt*g + O(dt^2)
         c1 = 1.
@@ -108,6 +110,20 @@ class Simulation(SkelSimulation):
                              +c3 * self.g,
                              +c6 * self.g])
 
+    def step(self):
+        """
+            Increment through the next time step of the simulation.
+        """
+        c3 = 0.
+        c6 = self.dt
+        g1 = random.gauss(0, self.noiselevel)
+        g2 = random.gauss(self.g, self.noiselevel)
+        self.rhs = np.array([+c3 * g1,
+                             +c6 * g1,
+                             +c3 * g2,
+                             +c6 * g2])
+        SkelSimulation.step(self)
+
 
 class KalmanWrapper(SkelKalmanWrapper):
     """
@@ -122,14 +138,14 @@ class KalmanWrapper(SkelKalmanWrapper):
         # _M = np.eye(4)  # Observation matrix.
 
         self.kalman = KalmanFilter(self.kalsim, _M)
-        self.kalman.S = np.eye(self.kalman.size_s) * 0.2  # Initial covariance estimate.
-        self.kalman.R = np.eye(self.kalman.size_o) * 0.2  # Estimated error in measurements.
+        self.kalman.S = np.eye(self.kalman.size_s) * 0.  # Initial covariance estimate.
+        self.kalman.R = np.eye(self.kalman.size_o) * self.reality.noiselevel ** 2  # Estimated error in measurements.
 
-        G = np.array([[_sim.dt**2 * 0.5,
-                       _sim.dt**2 * 0.5,
-                       _sim.dt**2 * 0.5,
+        G = np.array([[_sim.dt,
+                       _sim.dt ** 2 * 0.5,
+                       _sim.dt,
                        _sim.dt**2 * 0.5]])
-        self.kalman.Q = G.dot(np.transpose(G)) * 1.   # Estimated error in process.
+        self.kalman.Q = G.dot(np.transpose(G)) * self.kalsim.noiselevel ** 2   # Estimated error in process.
         # self.kalman.Q = np.eye(self.kalman.size_s) * 0.  # Estimated error in process.
 
     def setmes(self, field):
@@ -174,14 +190,24 @@ class Drop(EDP):
         * how to plot the results
     """
     Tfin = 15.
-    Iterations = 200
-    noiselevel = 20.
+    Iterations = 300
+    noise_real = 20
+    noise_sim = 10
 
     def __init__(self):
         EDP.__init__(self)
-        self.reality = Reality(self.Tfin, self.Iterations, self.noiselevel)
-        self.simulation = Simulation(self.Tfin, self.Iterations)
-        self.kalsim = Simulation(self.Tfin, self.Iterations)
+        print("Norme H1  |  reality  |    simu   |   kalman  | progress")
+        self.reinit()
+
+    def reinit(self):
+        """
+            Reinit everything
+        :param simu: the simulation to perform
+        :return: interation number
+        """
+        self.reality = Reality(self.Tfin, self.Iterations, self.noise_real)
+        self.simulation = Simulation(self.Tfin, self.Iterations, self.noise_sim)
+        self.kalsim = Simulation(self.Tfin, self.Iterations, self.noise_sim)
         self.kalman = KalmanWrapper(self.reality, self.kalsim)
 
     def compute(self, simu):
@@ -224,7 +250,7 @@ class Drop(EDP):
         ax = fig.gca()
         plt.xlabel('X position')
         plt.ylabel('Y position')
-        ax.set_xlim(0, 600)
+        ax.set_xlim(0, 1200)
         ax.set_ylim(-300, 400)
         # plt.title('Measurement of a Cannonball in Flight')
         plt.plot(field_ref[:, 0], field_ref[:, 2], '-',
@@ -239,6 +265,8 @@ class Drop(EDP):
             Run the test case
         :return:
         """
+        self.reinit()
+
         Sol_ref = np.zeros([self.Iterations, 4])
         Sol_mes = np.zeros([self.Iterations, 4])
         Sol_sim = np.zeros([self.Iterations, 4])
@@ -253,26 +281,24 @@ class Drop(EDP):
         # edp.plot(Sol_ref)
 
         Err_mes = self.norm(Sol_ref - Sol_mes) / Norm_ref
-        print("Norme H1 de la mesure", Err_mes)
         # edp.plot(Sol_mes)
 
         # ------------------------ Compute simulation without Kalman ----------------------------
 
         # Bad initial solution
-        self.simulation.setsol(Sol_mes[0, :])
+        self.simulation.setsol(Sol_ref[0, :])
 
         for it in self.compute(self.simulation):
             Sol_sim[it, :] = self.simulation.getsol()
 
         Err_sim = self.norm(Sol_ref - Sol_sim) / Norm_ref
-        print("Norme H1 de la simu", Err_sim)
 
         # edp.plot(Sol_sim)
 
         # ------------------------ Compute simulation with Kalman ----------------------------
 
         # Bad initial solution
-        self.kalsim.setsol(Sol_mes[0, :])
+        self.kalsim.setsol(Sol_ref[0, :])
         self.kalman.setmes(Sol_mes[1, :])
 
         for it in self.compute(self.kalman):
@@ -282,9 +308,10 @@ class Drop(EDP):
             # edp.plot(Sol_kal)
 
         Err_kal = self.norm(Sol_ref - Sol_kal) / Norm_ref
-        print("Norme H1 de la simu filtre", Err_kal)
         # edp.plot(Sol_kal)
 
         # ------------------------ Final plot ----------------------------
+
+        print("%9.2e | %9.2e | %9.2e | %9.2e | %5.2f" % (Norm_ref, Err_mes, Err_sim, Err_kal, Err_sim/Err_kal))
         if graphs:
             self.plotall(Sol_ref, Sol_mes, Sol_sim, Sol_kal)

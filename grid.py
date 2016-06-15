@@ -184,8 +184,8 @@ class Grid_Upwind(object):
         derx = np.zeros([self.nx, self.ny])
         for i in range(self.nx):
             for j in range(self.ny):
-                ap = max([self.velofield[i][j][0], 0.])
-                am = min([self.velofield[i][j][0], 0.])
+                ap = max([self.velofield[i][j][0], 0.])/2
+                am = min([self.velofield[i][j][0], 0.])/2
                 if i > 0:
                     derx[i][j] += ap * (field[i][j] - field[i - 1][j]) / self.dx
                 if i < self.nx - 1:
@@ -201,8 +201,8 @@ class Grid_Upwind(object):
         dery = np.zeros([self.nx, self.ny])
         for i in range(self.nx):
             for j in range(self.ny):
-                ap = max([self.velofield[i][j][1], 0.])
-                am = min([self.velofield[i][j][1], 0.])
+                ap = max([self.velofield[i][j][1], 0.])/2
+                am = min([self.velofield[i][j][1], 0.])/2
                 if j > 0:
                     dery[i][j] += ap * (field[i][j] - field[i][j - 1]) / self.dy
                 if j < self.ny - 1:

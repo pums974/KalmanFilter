@@ -211,11 +211,11 @@ class KalmanWrapper(SkelKalmanWrapper):
             Compute the next step of the simulation and apply kalman filter to the result
         """
         self.kalsim.step()
-        # self.setsol(self.kalsim.getsol)
-        # self.setmes(self.reality.getsolwithnoise())
-        # self.kalman.apply()
-        # self.kalsim.setsol(self.getsol)
-        self.setsol(self.reality.getsol)
+        self.setsol(self.kalsim.getsol)
+        self.setmes(self.reality.getsolwithnoise())
+        self.kalman.apply()
+        self.kalsim.setsol(self.getsol)
+        # self.setsol(self.reality.getsol)
 
 
 class Convection(EDP):
@@ -232,7 +232,7 @@ class Convection(EDP):
     ny = 20
     dtheta = 2. * math.pi / 10.
     noiselevel = .2
-    T_fin = 10.
+    T_fin = 20.
 
     def __init__(self):
         EDP.__init__(self)
@@ -246,7 +246,7 @@ class Convection(EDP):
         self.kalsim = Simulation(self.grid)
 
         self.dt = self.simulation.dt
-        self.n_it = int(self.T_fin / self.dt)
+        self.n_it = int(self.T_fin / self.dt) + 1
 
         self.reality = Reality(self.grid, self.dtheta, self.noiselevel, self.dt)
         self.kalman = KalmanWrapper(self.reality, self.kalsim)
@@ -259,7 +259,7 @@ class Convection(EDP):
         """
         self.reality.reinit()
         for i in range(self.n_it):
-            if i > 0:
+            if not self.reality == simu:
                 self.reality.step()
             simu.step()
             simu.err = self.norm(simu.getsol - self.reality.getsol)

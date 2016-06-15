@@ -59,8 +59,9 @@ class Simulation(SkelSimulation):
     err = 999
 
     # ---------------------------------METHODS-----------------------------------
-    def __init__(self, _grid, _power):
+    def __init__(self, _grid, _power,_noiselevel):
         SkelSimulation.__init__(self)
+        self.noiselevel = _noiselevel
 
         def indx(_i, _j):
             """
@@ -126,6 +127,29 @@ class Simulation(SkelSimulation):
         """
         self.field = np.reshape(field, [self.size])
 
+    def step(self):
+        """
+            Increment through the next time step of the simulation.
+        """
+        def indx(_i, _j):
+            """
+                Swith from coordinate to line number in the matrix
+            :param _i: x coordinate
+            :param _j: y coordinate
+            :return: line number
+            """
+            return _j + _i * self.grid.ny
+
+        power = np.random.normal(self.power, self.noiselevel, self.rhs.shape)
+        self.rhs = np.zeros([self.size]) + power * self.dt
+        for j in range(self.grid.ny):
+            self.rhs[indx(0, j)] = 0.
+            self.rhs[indx(self.grid.nx - 1, j)] = 0.
+        for i in range(self.grid.nx):
+            self.rhs[indx(i, 0)] = 0.
+            self.rhs[indx(i, self.grid.ny - 1)] = 0.
+        SkelSimulation.step(self)
+
 
 class KalmanWrapper(SkelKalmanWrapper):
     """
@@ -150,15 +174,16 @@ class KalmanWrapper(SkelKalmanWrapper):
         self.size = self.kalsim.size
         _M = self.getwindow()  # Observation matrix.
         self.kalman = KalmanFilter(self.kalsim, _M)
-        self.kalman.S = np.eye(self.kalman.size_s) * 0.2  # Initial covariance estimate.
-        self.kalman.R = np.eye(self.kalman.size_o) * 0.2  # Estimated error in measurements.
+        self.kalman.S = np.eye(self.kalman.size_s) * self.reality.noiselevel ** 2   # Initial covariance estimate.
+        self.kalman.R = np.eye(self.kalman.size_o) * self.reality.noiselevel ** 2   # Estimated error in measurements.
 
         G = np.zeros([self.kalman.size_s, 1])
         for i in range(self.kalsim.grid.nx):
             for j in range(self.kalsim.grid.ny):
-                G[indx(i, j)] = self.kalsim.grid.dx ** 3 / 6. \
-                              + self.kalsim.grid.dy ** 3 / 6. \
-                              + self.kalsim.dt ** 2 / 2.
+                # G[indx(i, j)] = self.kalsim.grid.dx ** 4 / 24. \
+                #               + self.kalsim.grid.dy ** 4 / 24. \
+                #               + self.kalsim.dt ** 2 / 2.
+                G[indx(i, j)] = self.kalsim.dt * self.kalsim.noiselevel ** 2
 
         self.kalman.Q = G.dot(np.transpose(G))
         # self.kalman.Q = np.eye(self.kalman.size_s) * 0.  # Estimated error in process.
@@ -176,32 +201,25 @@ class KalmanWrapper(SkelKalmanWrapper):
             :return: line number
             """
             return _j + _i * self.kalsim.grid.ny
-        # M = np.eye(self.kalsim.size)
-        # size_o = (self.kalsim.grid.nx - 4) * (self.kalsim.grid.ny - 4)
+        M = np.eye(self.kalsim.size)
+        # ep = 1
+        # size_o = 2 * ep * self.kalsim.grid.nx + 2 * ep * (self.kalsim.grid.ny - 2 * ep)
         # M = np.zeros([size_o, self.kalsim.size])
         # k = 0
-        # for i in range(2, self.kalsim.grid.nx - 2):
-        #     for j in range(2, self.kalsim.grid.ny - 2):
-        #         M[k][j + i * self.kalsim.grid.ny] = 1.
+        # for i in range(self.kalsim.grid.nx):
+        #     for j in range(0, ep):
+        #         M[k][indx(i, j)] = 1.
         #         k += 1
-        ep = 1
-        size_o = 2 * ep * self.kalsim.grid.nx + 2 * ep * (self.kalsim.grid.ny - 2 * ep)
-        M = np.zeros([size_o, self.kalsim.size])
-        k = 0
-        for i in range(self.kalsim.grid.nx):
-            for j in range(0, ep):
-                M[k][indx(i, j)] = 1.
-                k += 1
-            for j in range(self.kalsim.grid.ny - ep, self.kalsim.grid.ny):
-                M[k][indx(i, j)] = 1.
-                k += 1
-        for j in range(ep, self.kalsim.grid.ny - ep):
-            for i in range(0, ep):
-                M[k][indx(i, j)] = 1.
-                k += 1
-            for i in range(self.kalsim.grid.nx - ep, self.kalsim.grid.nx):
-                M[k][indx(i, j)] = 1.
-                k += 1
+        #     for j in range(self.kalsim.grid.ny - ep, self.kalsim.grid.ny):
+        #         M[k][indx(i, j)] = 1.
+        #         k += 1
+        # for j in range(ep, self.kalsim.grid.ny - ep):
+        #     for i in range(0, ep):
+        #         M[k][indx(i, j)] = 1.
+        #         k += 1
+        #     for i in range(self.kalsim.grid.nx - ep, self.kalsim.grid.nx):
+        #         M[k][indx(i, j)] = 1.
+        #         k += 1
         return M
 
     @property
@@ -244,14 +262,15 @@ class Chaleur(EDP):
     nx = 10
     ny = 20
     source_term = 2.
-    noiselevel = .2
+    noisereal = .2
+    noisesim = .5
 
     def __init__(self):
         EDP.__init__(self)
         self.grid = Grid_DF2(self.nx, self.ny, self.Lx, self.Ly)
-        self.reality = Reality(self.grid, self.source_term, self.noiselevel)
-        self.simulation = Simulation(self.grid, self.source_term)
-        self.kalsim = Simulation(self.grid, self.source_term)
+        self.reality = Reality(self.grid, self.source_term, self.noisereal)
+        self.simulation = Simulation(self.grid, self.source_term, self.noisesim)
+        self.kalsim = Simulation(self.grid, self.source_term, self.noisesim)
         self.kalman = KalmanWrapper(self.reality, self.kalsim)
 
     def compute(self, simu):
