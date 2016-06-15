@@ -4,11 +4,15 @@
     2D grid with finite difference derivative of second order
 """
 import numpy as np
+import matplotlib.pyplot as plt
+from matplotlib import animation
+from matplotlib import cm
+from mpl_toolkits.mplot3d import Axes3D
 
 
-class Grid_DF2(object):
+class Grid(object):
     """
-        2D grid with finite difference derivative of second order
+        Generic 2D grid
     """
 
     def __init__(self, _nx, _ny, _lx, _ly):
@@ -16,11 +20,177 @@ class Grid_DF2(object):
         self.Ly = _ly
         self.nx = _nx
         self.ny = _ny
+        self.size = _nx * _ny
+        self.shape = [_nx, _ny]
         coordx = np.linspace(-self.Lx / 2., self.Lx / 2., _nx)
         coordy = np.linspace(-self.Ly / 2., self.Ly / 2., _ny)
         self.dx = self.Lx / (self.nx - 1.)
         self.dy = self.Ly / (self.ny - 1.)
         self.coordy, self.coordx = np.meshgrid(coordy, coordx)
+
+    def indx(self, _i, _j):
+        """
+            Swith from coordinate to line number in the matrix
+        :param _i: x coordinate
+        :param _j: y coordinate
+        :return: line number
+        """
+        return _j + _i * self.ny
+
+    def derx(self, field):
+        """
+            Compute the first x-derivative of a field
+        :param field: field to be derived
+        :return: field derived
+        """
+        derx = np.zeros([self.nx, self.ny])
+        return derx
+
+    def dery(self, field):
+        """
+            Compute the first y-derivative of a field
+        :param field: field to be derived
+        :return: field derived
+        """
+        dery = np.zeros([self.nx, self.ny])
+        return dery
+
+    def dderx(self, field):
+        """
+            Compute the first x-derivative of a field
+        :param field: field to be derived
+        :return: field derived
+        """
+        dderx = np.zeros([self.nx, self.ny])
+        return dderx
+
+    def ddery(self, field):
+        """
+            Compute the first y-derivative of a field
+        :param field: field to be derived
+        :return: field derived
+        """
+        ddery = np.zeros([self.nx, self.ny])
+        return ddery
+
+    def norm_l2(self, field):
+        """
+            Compute the L2 norm of a field :
+            L1(field)^2 = sum_ij ( field_ij ^2 )
+        :param field: field
+        :return: norm
+        """
+        return np.sqrt(np.sum(np.square(field)))
+
+    def norm_h1(self, field):
+        """
+            Compute the H1 norm of a field :
+            H1(field)^2 = L2(field)^2 + L2(dx field)^2 + L2(dx field)^2
+        :param field: field
+        :return: norm
+        """
+        dx = self.derx(field)
+        dy = self.dery(field)
+        return np.sqrt(np.sum(np.square(field)) + np.sum(np.square(dx)) + np.sum(np.square(dy)))
+
+    def norm_inf(self, field):
+        """
+            Compute the H1 norm of a field :
+            H1(field)^2 = L2(field)^2 + L2(dx field)^2 + L2(dx field)^2
+        :param field: field
+        :return: norm
+        """
+        return np.max(np.abs(field))
+
+    def plot(self, field):
+        """
+            Plot one field
+        :param field: field
+        """
+        fig = plt.figure()
+        ax = fig.gca(projection='3d')
+        ax.set_xlim(-1, 1)
+        ax.set_ylim(-1, 1)
+        ax.set_zlim(-1, 1)
+        surf = ax.plot_surface(self.coordx, self.coordy, field, rstride=1,
+                               cstride=1, cmap=cm.coolwarm, linewidth=0, antialiased=False)
+        fig.colorbar(surf, shrink=0.5, aspect=5)
+        plt.show()
+
+    def animate(self, simu, compute):
+        """
+            Perform the simulation and produce animation a the same time
+        :param simu: the simulation to perform
+        :param compute: the generator to compute time steps
+        """
+
+        def plot_update(i):
+            """
+                Update the plot
+            :param i: iteration number
+            :return: surface to be plotted
+            """
+            ax.clear()
+            surf = ax.plot_surface(self.coordx, self.coordy, simu.getsol(), rstride=1,
+                                   cstride=1, cmap=cm.coolwarm, linewidth=0, antialiased=False)
+            ax.set_xlim(-1, 1)
+            ax.set_ylim(-1, 1)
+            ax.set_zlim(-1, 1)
+            ax.set_title('It = ' + str(i) + ',\n err = ' + str(simu.err))
+            return surf,
+
+        fig = plt.figure()
+        ax = fig.gca(projection='3d')
+        ax.set_xlim(-1, 1)
+        ax.set_ylim(-1, 1)
+        ax.set_zlim(-1, 1)
+
+        _ = animation.FuncAnimation(fig, plot_update, compute(simu), blit=False, interval=10,
+                                    repeat=False)
+        _ = plt.show()
+
+    def animatewithnoise(self, simu, compute, norm):
+        """
+            Perform the simulation and produce animation a the same time
+        :param simu: the simulation to perform
+        :param compute: the generator to compute time steps
+        :param norm: the norm to compute noise norm
+        """
+
+        def plot_update(i):
+            """
+                Update the plot
+            :param i: iteration number
+            :return: surface to be plotted
+            """
+            ax.clear()
+            surf = ax.plot_surface(self.coordx, self.coordy, simu.getsolwithnoise(), rstride=1,
+                                   cstride=1, cmap=cm.coolwarm, linewidth=0, antialiased=False)
+            simu.err = norm(simu.getsol() - simu.getsolwithnoise())
+            ax.set_xlim(-1, 1)
+            ax.set_ylim(-1, 1)
+            ax.set_zlim(-1, 1)
+            ax.set_title('It = ' + str(i) + ',\n err = ' + str(simu.err))
+            return surf,
+
+        fig = plt.figure()
+        ax = fig.gca(projection='3d')
+        ax.set_xlim(-1, 1)
+        ax.set_ylim(-1, 1)
+        ax.set_zlim(-1, 1)
+
+        _ = animation.FuncAnimation(fig, plot_update, compute(simu), blit=False, interval=10,
+                                    repeat=False)
+        plt.show()
+
+
+class Grid_DF2(Grid):
+    """
+        2D grid with finite difference derivative of second order
+    """
+
+    def __init__(self, _nx, _ny, _lx, _ly):
+        Grid.__init__(self, _nx, _ny, _lx, _ly)
         self.mat_derx = np.zeros([self.nx, self.ny, 3])
         self.mat_dderx = np.zeros([self.nx, self.ny, 3])
         self.mat_dery = np.zeros([self.nx, self.ny, 3])
@@ -136,43 +306,14 @@ class Grid_DF2(object):
 
         return ddery
 
-    def norm_h1(self, field):
-        """
-            Compute the H1 norm of a field :
-            H1(field)^2 = L2(field)^2 + L2(dx field)^2 + L2(dx field)^2
-        :param field: field
-        :return: norm
-        """
-        dx = self.derx(field)
-        dy = self.dery(field)
-        return np.sqrt(np.sum(np.square(field)) + np.sum(np.square(dx)) + np.sum(np.square(dy)))
 
-    @staticmethod
-    def norm_l2(field):
-        """
-            Compute the L2 norm of a field :
-            L1(field)^2 = sum_ij ( field_ij ^2 )
-        :param field: field
-        :return: norm
-        """
-        return np.sqrt(np.sum(np.square(field)))
-
-
-class Grid_Upwind(object):
+class Grid_Upwind(Grid):
     """
         2D grid with finite difference derivative of second order
     """
 
     def __init__(self, _nx, _ny, _lx, _ly):
-        self.Lx = _lx
-        self.Ly = _ly
-        self.nx = _nx
-        self.ny = _ny
-        coordx = np.linspace(-self.Lx / 2., self.Lx / 2., _nx)
-        coordy = np.linspace(-self.Ly / 2., self.Ly / 2., _ny)
-        self.dx = self.Lx / (self.nx - 1.)
-        self.dy = self.Ly / (self.ny - 1.)
-        self.coordy, self.coordx = np.meshgrid(coordy, coordx)
+        Grid.__init__(self, _nx, _ny, _lx, _ly)
         self.velofield = np.zeros([self.nx, self.ny, 2])
 
     def derx(self, field):
@@ -208,13 +349,3 @@ class Grid_Upwind(object):
                 if j < self.ny - 1:
                     dery[i][j] += am * (field[i][j + 1] - field[i][j]) / self.dy
         return dery
-
-    @staticmethod
-    def norm_l2(field):
-        """
-            Compute the L2 norm of a field :
-            L1(field)^2 = sum_ij ( field_ij ^2 )
-        :param field: field
-        :return: norm
-        """
-        return np.sqrt(np.sum(np.square(field)))

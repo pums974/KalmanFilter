@@ -13,13 +13,22 @@ class SkelReality(object):
         This class contains the analytical solution of our problem
         It also provide way to get a noisy field around this solution
     """
-    # ---------------------------------METHODS-----------------------------------
-    def __init__(self, _noiselevel):
-        self.noiselevel = _noiselevel
-        self.field = np.zeros([0])
-        self.addnoisev = np.vectorize(self.addnoise)
+    It = - 1
+    nIt = 0
+    err = 999.
+    dt = 0.
+    noiselevel = 0.
+    size = 0
+    field = np.zeros([size])
 
-    @property
+    # ---------------------------------METHODS-----------------------------------
+    def __init__(self, _noiselevel, _dt, _shape):
+        self.noiselevel = _noiselevel
+        self.dt = _dt
+        self.addnoisev = np.vectorize(self.addnoise)
+        self.size = np.prod(_shape)
+        self.field = np.zeros(_shape)
+
     def getsol(self):
         """
             Extract the solution, here it's trivial
@@ -28,6 +37,11 @@ class SkelReality(object):
         return self.field
 
     def addnoise(self, value):
+        """
+            Add noise around a value
+        :param value:
+        :return:
+        """
         return random.gauss(value, self.noiselevel)
 
     def getsolwithnoise(self):
@@ -48,17 +62,42 @@ class SkelReality(object):
         """
         pass
 
+    def step(self):
+        """
+            Compute the analytical solution
+        """
+        pass
+
+    def reinit(self):
+        """
+            reinitialize the iteration number
+        """
+        self.It = - 1
+        self.step()
+
 
 class SkelSimulation(object):
     """
     This class contains everything for the simulation
     """
+    It = - 1
+    nIt = 0
+    err = 999.
+    dt = 0.
+    noiselevel = 0.
+    size = 0
+    field = np.zeros([0])
+    Mat = np.array([[]])
+    rhs = np.array([])
+
     # ---------------------------------METHODS-----------------------------------
-    def __init__(self):
-        self.field = np.zeros([0])
-        self.Mat = np.array([[]])
-        self.rhs = np.array([])
-        self.It = 0
+    def __init__(self, _noiselevel, _dt, _shape):
+        self.noiselevel = _noiselevel
+        self.dt = _dt
+        self.size = np.product(_shape)
+        self.field = np.zeros(_shape)
+        self.Mat = np.zeros(self.size)
+        self.rhs = np.zeros(self.size)
 
     def getsol(self):
         """
@@ -86,14 +125,35 @@ class SkelKalmanWrapper(object):
     """
         This class is use around the simulation to apply the kalman filter
     """
+    It = - 1
+    nIt = 0
+    err = 999.
+    dt = 0.
+    size = 0
+
     def __init__(self, _reality, _sim):
         self.reality = _reality
         self.kalsim = _sim
-        _M = np.array([[]])  # Observation matrix.
+
+        self.It = self.kalsim.It
+        self.nIt = self.kalsim.nIt
+        self.err = self.kalsim.err
+        self.dt = self.kalsim.dt
+        self.size = self.kalsim.size
+
+        _M = self.getwindow()  # Observation matrix.
         self.kalman = KalmanFilter(self.kalsim, _M)
-        self.kalman.S = np.eye(self.kalman.size_s) * 0.2  # Initial covariance estimate.
-        self.kalman.R = np.eye(self.kalman.size_o) * 0.2  # Estimated error in measurements.
-        self.kalman.Q = np.eye(self.kalman.size_s) * 0.  # Estimated error in process.
+        self.kalman.S = np.eye(self.kalman.size_s) * self.reality.noiselevel ** 2   # Initial covariance estimate.
+        self.kalman.R = np.eye(self.kalman.size_o) * self.reality.noiselevel ** 2   # Estimated error in measurements.
+        self.kalman.Q = np.eye(self.kalman.size_s) * self.kalsim.noiselevel ** 2    # Estimated error in process.
+
+    def getwindow(self):
+        """
+            Produce the observation matrix : designate what we conserve of the noisy field
+        :return: observation matrix
+        """
+        M = np.eye(self.kalsim.size)
+        return M
 
     def setmes(self, field):
         """
@@ -102,7 +162,6 @@ class SkelKalmanWrapper(object):
         """
         self.kalman.Y = self.kalman.M.dot(np.reshape(field, self.kalman.size_s))
 
-    @property
     def getsol(self):
         """
             Extract the solution from kalman filter
@@ -123,10 +182,11 @@ class SkelKalmanWrapper(object):
             Compute the next step of the simulation and apply kalman filter to the result
         """
         self.kalsim.step()
-        self.setsol(self.kalsim.getsol)
-        self.setmes(self.reality.getsolwithnoise)
+        self.setsol(self.kalsim.getsol())
+        self.setmes(self.reality.getsolwithnoise())
         self.kalman.apply()
-        self.kalsim.setsol(self.getsol)
+        self.kalsim.setsol(self.getsol())
+        self.It = self.kalsim.It
 
 
 class EDP(object):
@@ -138,20 +198,30 @@ class EDP(object):
         * how to plot the results
     """
     noise_real = 20.
+    noise_sim = 20.
+    dt = 0.
+    nIt = 0
 
     def __init__(self):
-        self.reality = SkelReality(self.noise_real)
-        self.simulation = SkelSimulation()
-        self.kalsim = SkelSimulation()
+        self.simulation = SkelSimulation(self.noise_sim, self.dt, [0])
+        self.kalsim = SkelSimulation(self.noise_sim, self.dt, [0])
+        self.dt = self.simulation.dt
+        self.reality = SkelReality(self.noise_real, self.dt, [0])
         self.kalman = SkelKalmanWrapper(self.reality, self.kalsim)
 
     def compute(self, simu):
         """
-            Compute the next step of a simulation (filtered or not)
-        :param simu: the simulation to perform
-        :return: interation number
+            Generator : each call produce a time step the a simulation
+        :param simu: the simulation to perform (filtered or not)
+        :return: iteration number
         """
-        pass
+        self.reality.reinit()
+        for i in range(simu.nIt):
+            if i > 0:
+                if not self.reality == simu:
+                    self.reality.step()
+                simu.step()
+            yield i
 
     def norm(self, field):
         """

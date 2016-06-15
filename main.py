@@ -31,16 +31,24 @@ import pprofile
 
 
 def test_cases():
+    """
+    Generator of all the considered test cases
+    :return:
+    """
     yield Drop()
-    # yield Chaleur()
-    # yield Convection()
+    yield Chaleur()
+    yield Convection()
 
 
 def run():
-    for i in range(10):
+    """
+        Do we run the tests cases multiple time ?
+    :return:
+    """
+    for i in range(1):
         edp.run_test_case(graphs)
 
-graphs = False
+graphs = True
 profile = False
 
 for edp in test_cases():

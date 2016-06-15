@@ -13,11 +13,7 @@
     * one animation of the filtered simulation during time convergence
 """
 from __future__ import print_function
-import matplotlib.pyplot as plt
 import numpy as np
-from matplotlib import animation
-from matplotlib import cm
-from mpl_toolkits.mplot3d import Axes3D
 
 from kalman import KalmanFilter
 from skeleton import *
@@ -31,19 +27,21 @@ class Reality(SkelReality):
     """
     # ---------------------------------METHODS-----------------------------------
 
-    def __init__(self, _grid, _source_term, _noiselevel):
-        SkelReality.__init__(self, _noiselevel)
-        self.source_term = _source_term
+    def __init__(self, _grid, _power, _noiselevel, _dt):
         self.grid = _grid
-        self.field = np.zeros([self.grid.nx, self.grid.ny])
+        SkelReality.__init__(self, _noiselevel, _dt, _grid.shape)
+        self.power = _power
 
-    def compute(self):
+    def step(self):
         """
             Compute the analytical solution
         """
+        self.field = np.zeros([self.grid.nx, self.grid.ny])
+        self.It += 1
+        time = self.It * self.dt
         for i in range(self.grid.nx):
             for j in range(self.grid.ny):
-                self.field[i][j] = 1. - self.source_term * (
+                self.field[i][j] = 1. - self.power * (
                     (self.grid.coordx[i][j]) ** 2 + (self.grid.coordy[i][j]) ** 2) / 4.
 
 
@@ -52,36 +50,19 @@ class Simulation(SkelSimulation):
     This class contains everything for the simulation
     """
     # --------------------------------PARAMETERS--------------------------------
-    dt = 0.01
     cfl = 1. / 4.
-    conv = 1.
-    conv_crit = 1e-3
-    err = 999
 
     # ---------------------------------METHODS-----------------------------------
-    def __init__(self, _grid, _power,_noiselevel):
-        SkelSimulation.__init__(self)
-        self.noiselevel = _noiselevel
-
-        def indx(_i, _j):
-            """
-                Swith from coordinate to line number in the matrix
-            :param _i: x coordinate
-            :param _j: y coordinate
-            :return: line number
-            """
-            return _j + _i * ny
-
-        self.power = _power
+    def __init__(self, _grid, _power, _noiselevel):
         self.grid = _grid
+        self.dt = min([self.grid.dx ** 2, self.grid.dy ** 2]) * self.cfl
+
+        SkelSimulation.__init__(self, _noiselevel, self.dt, self.grid.shape)
+        self.power = _power
         nx = _grid.nx
         ny = _grid.ny
-        self.size = nx * ny
-        if self.cfl:
-            self.dt = min([self.grid.dx ** 2, self.grid.dy ** 2]) * self.cfl
-        print("cfl = ", max([self.dt / (self.grid.dx ** 2), self.dt / (self.grid.dy ** 2)]))
-        print("dt = ", self.dt)
 
+        indx = self.grid.indx
         # compute matrix
         # time
         self.Mat = np.eye(self.size, self.size)
@@ -92,9 +73,9 @@ class Simulation(SkelSimulation):
                 self.field[i, j] = self.dt
                 self.Mat[indx(i, j)] += np.reshape(self.grid.dderx(self.field), [self.size])
                 self.Mat[indx(i, j)] += np.reshape(self.grid.ddery(self.field), [self.size])
+        self.Mat = self.Mat.transpose()
         # rhs and boundary conditions
         self.rhs = np.zeros([self.size]) + self.power * self.dt
-        self.Mat = self.Mat.transpose()
         for j in range(ny):
             self.Mat[indx(0, j)] = np.zeros([self.size])
             self.Mat[indx(nx - 1, j)] = np.zeros([self.size])
@@ -110,9 +91,7 @@ class Simulation(SkelSimulation):
             self.rhs[indx(i, 0)] = 0.
             self.rhs[indx(i, ny - 1)] = 0.
         self.field = np.zeros([self.size])
-        self.oldfield = np.zeros([self.size])
 
-    @property
     def getsol(self):
         """
             Get current solution
@@ -131,15 +110,7 @@ class Simulation(SkelSimulation):
         """
             Increment through the next time step of the simulation.
         """
-        def indx(_i, _j):
-            """
-                Swith from coordinate to line number in the matrix
-            :param _i: x coordinate
-            :param _j: y coordinate
-            :return: line number
-            """
-            return _j + _i * self.grid.ny
-
+        indx = self.grid.indx
         power = np.random.normal(self.power, self.noiselevel, self.rhs.shape)
         self.rhs = np.zeros([self.size]) + power * self.dt
         for j in range(self.grid.ny):
@@ -155,21 +126,7 @@ class KalmanWrapper(SkelKalmanWrapper):
     """
         This class is use around the simulation to apply the kalman filter
     """
-    conv = 1.
-    conv_crit = 1e-2
-    err = 999
-
     def __init__(self, _reality, _sim):
-
-        def indx(_i, _j):
-            """
-                Swith from coordinate to line number in the matrix
-            :param _i: x coordinate
-            :param _j: y coordinate
-            :return: line number
-            """
-            return _j + _i * self.kalsim.grid.ny
-
         SkelKalmanWrapper.__init__(self, _reality, _sim)
         self.size = self.kalsim.size
         _M = self.getwindow()  # Observation matrix.
@@ -177,30 +134,24 @@ class KalmanWrapper(SkelKalmanWrapper):
         self.kalman.S = np.eye(self.kalman.size_s) * self.reality.noiselevel ** 2   # Initial covariance estimate.
         self.kalman.R = np.eye(self.kalman.size_o) * self.reality.noiselevel ** 2   # Estimated error in measurements.
 
+        indx = self.kalsim.grid.indx
         G = np.zeros([self.kalman.size_s, 1])
         for i in range(self.kalsim.grid.nx):
             for j in range(self.kalsim.grid.ny):
                 # G[indx(i, j)] = self.kalsim.grid.dx ** 4 / 24. \
                 #               + self.kalsim.grid.dy ** 4 / 24. \
                 #               + self.kalsim.dt ** 2 / 2.
-                G[indx(i, j)] = self.kalsim.dt * self.kalsim.noiselevel ** 2
+                G[indx(i, j)] = self.kalsim.dt
 
-        self.kalman.Q = G.dot(np.transpose(G))
-        # self.kalman.Q = np.eye(self.kalman.size_s) * 0.  # Estimated error in process.
+        self.kalman.Q = G.dot(np.transpose(G)) * self.kalsim.noiselevel ** 2  # Estimated error in process.
+        # self.kalman.Q = np.eye(self.kalman.size_s) * self.kalsim.noiselevel ** 2  # Estimated error in process.
 
     def getwindow(self):
         """
             Produce the observation matrix : designate what we conserve of the noisy field
         :return: observation matrix
         """
-        def indx(_i, _j):
-            """
-                Swith from coordinate to line number in the matrix
-            :param _i: x coordinate
-            :param _j: y coordinate
-            :return: line number
-            """
-            return _j + _i * self.kalsim.grid.ny
+        indx = self.kalsim.grid.indx
         M = np.eye(self.kalsim.size)
         # ep = 1
         # size_o = 2 * ep * self.kalsim.grid.nx + 2 * ep * (self.kalsim.grid.ny - 2 * ep)
@@ -222,7 +173,6 @@ class KalmanWrapper(SkelKalmanWrapper):
         #         k += 1
         return M
 
-    @property
     def getsol(self):
         """
             Extract the solution from kalman filter : has to reshape it
@@ -238,16 +188,6 @@ class KalmanWrapper(SkelKalmanWrapper):
         self.kalman.X = np.reshape(field, self.kalman.size_s)
         self.kalsim.setsol(field)
 
-    def step(self):
-        """
-            Compute the next step of the simulation and apply kalman filter to the result
-        """
-        self.kalsim.step()
-        self.setsol(self.kalsim.getsol)
-        self.setmes(self.reality.getsolwithnoise())
-        self.kalman.apply()
-        self.kalsim.setsol(self.getsol)
-
 
 class Chaleur(EDP):
     """
@@ -261,16 +201,35 @@ class Chaleur(EDP):
     Ly = 3.
     nx = 10
     ny = 20
-    source_term = 2.
-    noisereal = .2
-    noisesim = .5
+    power = 2.
+    noise_real = .2
+    noise_sim = .5
+    dt = 0.
+    nIt = 150
 
     def __init__(self):
         EDP.__init__(self)
         self.grid = Grid_DF2(self.nx, self.ny, self.Lx, self.Ly)
-        self.reality = Reality(self.grid, self.source_term, self.noisereal)
-        self.simulation = Simulation(self.grid, self.source_term, self.noisesim)
-        self.kalsim = Simulation(self.grid, self.source_term, self.noisesim)
+        self.reinit()
+        print("cfl = ", max([self.dt / (self.grid.dx ** 2), self.dt / (self.grid.dy ** 2)]))
+        print("dt = ", self.dt)
+        print("Norme H1 |  reality  |   simu   |  kalman")
+
+    def reinit(self):
+        """
+            Reinit everything
+        :return:
+        """
+        self.simulation = Simulation(self.grid, self.power, self.noise_sim)
+        self.kalsim = Simulation(self.grid, self.power, self.noise_sim)
+
+        self.dt = self.simulation.dt
+        self.reality = Reality(self.grid, self.power, self.noise_real, self.dt)
+
+        self.simulation.nIt = self.nIt
+        self.kalsim.nIt = self.nIt
+        self.reality.nIt = self.nIt
+
         self.kalman = KalmanWrapper(self.reality, self.kalsim)
 
     def compute(self, simu):
@@ -279,14 +238,8 @@ class Chaleur(EDP):
         :param simu: the simulation to perform (filtered or not)
         :return: iteration number
         """
-        i = 0
-        while simu.conv > simu.conv_crit:
-            i += 1
-            oldfield = simu.getsol
-            simu.step()
-            newfield = simu.getsol
-            simu.conv = self.norm_l2(oldfield - newfield)
-            simu.err = self.norm(newfield - self.reality.getsol)
+        for i in EDP.compute(self, simu):
+            simu.err = self.norm(simu.getsol() - self.reality.getsol())
             yield i
 
     def norm(self, field):
@@ -297,96 +250,63 @@ class Chaleur(EDP):
         """
         return self.grid.norm_h1(field)
 
-    def norm_l2(self, field):
-        """
-            Compute the L2 nor of the field
-        :param field: field
-        :return:  norm L2
-        """
-        return self.grid.norm_l2(field)
-
     def plot(self, field):
         """
             Plot one field
         :param field: field
         """
-        fig = plt.figure()
-        ax = fig.gca(projection='3d')
-        ax.set_xlim(-1, 1)
-        ax.set_ylim(-1, 1)
-        ax.set_zlim(-1, 1)
-        surf = ax.plot_surface(self.grid.coordx, self.grid.coordy, field, rstride=1,
-                               cstride=1, cmap=cm.coolwarm, linewidth=0, antialiased=False)
-        fig.colorbar(surf, shrink=0.5, aspect=5)
-        plt.show()
+        self.grid.plot(field)
 
     def animate(self, simu):
         """
             Perform the simulation and produce animation a the same time
         :param simu: the simulation to perform
         """
-        def plot_update(i):
-            """
-                Update the plot
-            :param i: iteration number
-            :return: surface to be plotted
-            """
-            ax.clear()
-            surf = ax.plot_surface(self.grid.coordx, self.grid.coordy, simu.getsol, rstride=1,
-                                   cstride=1, cmap=cm.coolwarm, linewidth=0, antialiased=False)
-            ax.set_xlim(-1, 1)
-            ax.set_ylim(-1, 1)
-            ax.set_zlim(-1, 1)
-            ax.set_title('It = ' + str(i) + ',\n conv = ' + str(simu.conv) + ',\n err = ' + str(simu.err))
-            return surf,
+        self.grid.animate(simu, self.compute)
 
-        fig = plt.figure()
-        ax = fig.gca(projection='3d')
-        ax.set_xlim(-1, 1)
-        ax.set_ylim(-1, 1)
-        ax.set_zlim(-1, 1)
-
-        _ = animation.FuncAnimation(fig, plot_update, self.compute(simu), blit=False, interval=10,
-                                    repeat=False)
-        plt.show()
+    def animatewithnoise(self, simu):
+        """
+            Perform the simulation and produce animation a the same time
+        :param simu: the simulation to perform
+        """
+        self.grid.animatewithnoise(simu, self.compute, self.norm)
 
     def run_test_case(self, graphs):
         """
             Run the test case
         :return:
         """
-        # ----------------- Compute reality and measurement --------------------
-        self.reality.compute()
+        self.reinit()
 
-        Sol_ref = self.reality.getsol
+        # ----------------- Compute reality and measurement --------------------
+        if graphs:
+            self.animate(self.reality)
+        else:
+            for it in self.compute(self.reality):
+                pass
+        Sol_ref = self.reality.getsol()
+        if graphs:
+            self.animatewithnoise(self.reality)
         Sol_mes = self.reality.getsolwithnoise()
 
         Norm_ref = self.norm(Sol_ref)
-        if graphs:
-            self.plot(Sol_ref)
-
         Err_mes = self.norm(Sol_ref - Sol_mes) / Norm_ref
-        print("Norme H1 de la mesure", Err_mes)
-        if graphs:
-            self.plot(Sol_mes)
 
         # ------------------------ Compute simulation without Kalman ----------------------------
-        print("Simulation sans Kalman...")
-        # Bad initial solution and boundary condition
+        self.reality.reinit()
+        # Initial solution
         self.simulation.setsol(self.reality.getsolwithnoise())
-
         if graphs:
             self.animate(self.simulation)
         else:
             for it in self.compute(self.simulation):
                 pass
-        Sol_sim = self.simulation.getsol
+        Sol_sim = self.simulation.getsol()
         Err_sim = self.norm(Sol_ref - Sol_sim) / Norm_ref
-        print("Norme H1 de la simu", Err_sim)
 
         # ------------------------ Compute simulation with Kalman ----------------------------
-        print("Simulation avec Kalman...")
-        # Bad initial solution
+        self.reality.reinit()
+        # Initial solution
         self.kalman.setsol(self.reality.getsolwithnoise())
 
         if graphs:
@@ -394,6 +314,10 @@ class Chaleur(EDP):
         else:
             for it in self.compute(self.kalman):
                 pass
-        Sol_kal = self.kalman.getsol
+        Sol_kal = self.kalman.getsol()
         Err_kal = self.norm(Sol_ref - Sol_kal) / Norm_ref
-        print("Norme H1 de la simu filtre", Err_kal)
+
+        # ------------------------ Final output ----------------------------
+
+        print("%8.2e | %8.2e | %8.2e" % (np.max(Sol_ref), np.max(Sol_ref), np.max(Sol_ref)))
+

@@ -29,50 +29,44 @@ class Reality(SkelReality):
     frot = 0.0
 
     # ---------------------------------METHODS-----------------------------------
-    def __init__(self, _tfin, _it, _noiselevel):
-        SkelReality.__init__(self, _noiselevel)
-        self.Tfin = _tfin
-        self.It = _it
-        self.dt = _tfin / _it
-        self.field = np.zeros([4])
+    def __init__(self, _dt, _noiselevel):
+        SkelReality.__init__(self, _noiselevel, _dt, [4])
         self.init = np.array([0.,
                               self.power * math.cos(self.dir * math.pi / 180.),
                               0.,
                               self.power * math.sin(self.dir * math.pi / 180.)])
 
-    @property
-    def compute(self):
+    def step(self):
         """
-            Generator : each call gives you next step of the analytical solution
+            Compute the analytical solution
         """
-        for i in range(self.It):
-            time = i * self.dt
-            # avec frottement
-            # This is the solution of
-            # a = - g - h * v
-            # x(0) = (0, 0)
-            # c1 = 0.
-            # c2 = self.init[1] + c1
-            # c3 = math.exp(-self.frot * time)
-            # c4 = self.init[0] + c2 / self.frot
-            # self.field[0] = c4 - c2 / self.frot * c3 - c1 * time
-            # self.field[1] = c2 * math.exp(-self.frot * time) - c1
-            # c1 = - self.g / self.frot
-            # c2 = self.init[3] + c1
-            # c4 = self.init[2] + c2 / self.frot
-            # self.field[2] = c4 - c2 / self.frot * c3 - c1 * time
-            # self.field[3] = c2 * math.exp(-self.frot * time) - c1
+        self.field = np.zeros([self.size])
+        self.It += 1
+        time = self.It * self.dt
+        # avec frottement
+        # This is the solution of
+        # a = - g - h * v
+        # x(0) = (0, 0)
+        # c1 = 0.
+        # c2 = self.init[1] + c1
+        # c3 = math.exp(-self.frot * time)
+        # c4 = self.init[0] + c2 / self.frot
+        # self.field[0] = c4 - c2 / self.frot * c3 - c1 * time
+        # self.field[1] = c2 * math.exp(-self.frot * time) - c1
+        # c1 = - self.g / self.frot
+        # c2 = self.init[3] + c1
+        # c4 = self.init[2] + c2 / self.frot
+        # self.field[2] = c4 - c2 / self.frot * c3 - c1 * time
+        # self.field[3] = c2 * math.exp(-self.frot * time) - c1
 
-            # sans frottement
-            # This is the solution of
-            # a = - g
-            # x(0) = (0, 0)
-            self.field[0] = self.init[0] + self.init[1] * time
-            self.field[1] = self.init[1]
-            self.field[2] = self.init[2] + self.init[3] * time + 0.5 * self.g * time * time
-            self.field[3] = self.init[3] + self.g * time
-
-            yield i
+        # sans frottement
+        # This is the solution of
+        # a = - g
+        # x(0) = (0, 0)
+        self.field[0] = self.init[0] + self.init[1] * time
+        self.field[1] = self.init[1]
+        self.field[2] = self.init[2] + self.init[3] * time + 0.5 * self.g * time * time
+        self.field[3] = self.init[3] + self.g * time
 
 
 class Simulation(SkelSimulation):
@@ -86,13 +80,9 @@ class Simulation(SkelSimulation):
     frot = 0.0
 
     # ---------------------------------METHODS-----------------------------------
-    def __init__(self, _tfin, _it, _noiselevel):
-        SkelSimulation.__init__(self)
-        self.Tfin = _tfin
-        self.It = _it
-        self.dt = _tfin / _it
-        self.field = np.zeros([_it, 4])
-        self.noiselevel = _noiselevel
+    def __init__(self, _dt, _noiselevel):
+        SkelSimulation.__init__(self, _noiselevel, _dt, [4])
+
         # x_n+1 = x_n + dt * v_n + O(dt^2)
         # v_n+1 = (1 - h*dt) v_n - dt*g + O(dt^2)
         c1 = 1.
@@ -131,13 +121,6 @@ class KalmanWrapper(SkelKalmanWrapper):
     """
     def __init__(self, _reality, _sim):
         SkelKalmanWrapper.__init__(self, _reality, _sim)
-        self.It = _sim.It
-        _M = np.array([[1, 0, 0, 0],
-                       [0, 0, 1, 0]])  # Observation matrix.
-
-        # _M = np.eye(4)  # Observation matrix.
-
-        self.kalman = KalmanFilter(self.kalsim, _M)
         self.kalman.S = np.eye(self.kalman.size_s) * 0.  # Initial covariance estimate.
         self.kalman.R = np.eye(self.kalman.size_o) * self.reality.noiselevel ** 2  # Estimated error in measurements.
 
@@ -146,7 +129,19 @@ class KalmanWrapper(SkelKalmanWrapper):
                        _sim.dt,
                        _sim.dt**2 * 0.5]])
         self.kalman.Q = G.dot(np.transpose(G)) * self.kalsim.noiselevel ** 2   # Estimated error in process.
-        # self.kalman.Q = np.eye(self.kalman.size_s) * 0.  # Estimated error in process.
+        # self.kalman.Q = np.eye(self.kalman.size_s) * self.kalsim.noiselevel ** 2  # Estimated error in process.
+
+    def getwindow(self):
+        """
+            Produce the observation matrix : designate what we conserve of the noisy field
+        :return: observation matrix
+        """
+
+        M = np.array([[1, 0, 0, 0],
+                      [0, 0, 1, 0]])
+
+        # M = np.eye(self.kalsim.size)
+        return M
 
     def setmes(self, field):
         """
@@ -171,15 +166,6 @@ class KalmanWrapper(SkelKalmanWrapper):
         self.kalman.X = field[..., np.newaxis]
         self.kalsim.setsol(field)
 
-    def step(self):
-        """
-            Increment to the next step of the simulation
-        """
-        self.kalsim.step()
-        self.setsol(self.kalsim.getsol())
-        self.kalman.apply()
-        self.kalsim.setsol(self.getsol())
-
 
 class Drop(EDP):
     """
@@ -190,36 +176,33 @@ class Drop(EDP):
         * how to plot the results
     """
     Tfin = 15.
-    Iterations = 300
+    nIt = 300
     noise_real = 20
     noise_sim = 10
+    dt = Tfin / nIt
 
     def __init__(self):
         EDP.__init__(self)
-        print("Norme H1  |  reality  |    simu   |   kalman  | progress")
+        print("Norme L2 |  mesure  |   simu   |  kalman")
+
         self.reinit()
 
     def reinit(self):
         """
             Reinit everything
-        :param simu: the simulation to perform
-        :return: interation number
+        :return:
         """
-        self.reality = Reality(self.Tfin, self.Iterations, self.noise_real)
-        self.simulation = Simulation(self.Tfin, self.Iterations, self.noise_sim)
-        self.kalsim = Simulation(self.Tfin, self.Iterations, self.noise_sim)
-        self.kalman = KalmanWrapper(self.reality, self.kalsim)
+        self.simulation = Simulation(self.dt, self.noise_sim)
+        self.kalsim = Simulation(self.dt, self.noise_sim)
 
-    def compute(self, simu):
-        """
-            Compute the next step of a simulation (filtered or not)
-        :param simu: the simulation to perform
-        :return: interation number
-        """
-        for i in range(simu.It):
-            if i > 0:
-                simu.step()
-            yield i
+        self.dt = self.simulation.dt
+        self.reality = Reality(self.dt, self.noise_real)
+
+        self.simulation.nIt = self.nIt
+        self.kalsim.nIt = self.nIt
+        self.reality.nIt = self.nIt
+
+        self.kalman = KalmanWrapper(self.reality, self.kalsim)
 
     @staticmethod
     def plot(field):
@@ -267,51 +250,42 @@ class Drop(EDP):
         """
         self.reinit()
 
-        Sol_ref = np.zeros([self.Iterations, 4])
-        Sol_mes = np.zeros([self.Iterations, 4])
-        Sol_sim = np.zeros([self.Iterations, 4])
-        Sol_kal = np.zeros([self.Iterations, 4])
+        Sol_ref = np.zeros([self.nIt, 4])
+        Sol_mes = np.zeros([self.nIt, 4])
+        Sol_sim = np.zeros([self.nIt, 4])
+        Sol_kal = np.zeros([self.nIt, 4])
 
         # ----------------- Compute reality and measurement --------------------
-        for it in self.reality.compute:
-            Sol_ref[it, :] = self.reality.getsol
+        for it in self.compute(self.reality):
+            Sol_ref[it, :] = self.reality.getsol()
             Sol_mes[it, :] = self.reality.getsolwithnoise()
 
         Norm_ref = self.norm(Sol_ref)
-        # edp.plot(Sol_ref)
-
         Err_mes = self.norm(Sol_ref - Sol_mes) / Norm_ref
-        # edp.plot(Sol_mes)
 
         # ------------------------ Compute simulation without Kalman ----------------------------
-
-        # Bad initial solution
-        self.simulation.setsol(Sol_ref[0, :])
+        self.reality.reinit()
+        # Initial solution
+        self.simulation.setsol(self.reality.getsol())
 
         for it in self.compute(self.simulation):
             Sol_sim[it, :] = self.simulation.getsol()
 
         Err_sim = self.norm(Sol_ref - Sol_sim) / Norm_ref
 
-        # edp.plot(Sol_sim)
-
         # ------------------------ Compute simulation with Kalman ----------------------------
 
-        # Bad initial solution
-        self.kalsim.setsol(Sol_ref[0, :])
-        self.kalman.setmes(Sol_mes[1, :])
+        self.reality.reinit()
+        # Initial solution
+        self.kalman.setsol(self.reality.getsol())
 
         for it in self.compute(self.kalman):
             Sol_kal[it, :] = self.kalman.getsol()
-            if it < self.Iterations-1:
-                self.kalman.setmes(Sol_mes[it + 1, :])
-            # edp.plot(Sol_kal)
 
         Err_kal = self.norm(Sol_ref - Sol_kal) / Norm_ref
-        # edp.plot(Sol_kal)
 
-        # ------------------------ Final plot ----------------------------
+        # ------------------------ Final output ----------------------------
 
-        print("%9.2e | %9.2e | %9.2e | %9.2e | %5.2f" % (Norm_ref, Err_mes, Err_sim, Err_kal, Err_sim/Err_kal))
+        print("%8.2e | %8.2e | %8.2e | %8.2e" % (Norm_ref, Err_mes, Err_sim, Err_kal))
         if graphs:
             self.plotall(Sol_ref, Sol_mes, Sol_sim, Sol_kal)
