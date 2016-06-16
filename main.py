@@ -28,6 +28,7 @@ from convection import Convection
 # import pstats
 # import os
 import pprofile
+import time
 
 
 def test_cases():
@@ -35,9 +36,9 @@ def test_cases():
     Generator of all the considered test cases
     :return:
     """
-    yield Drop()
+    # yield Drop()
     yield Chaleur()
-    yield Convection()
+    # yield Convection()
 
 
 def run():
@@ -45,10 +46,13 @@ def run():
         Do we run the tests cases multiple time ?
     :return:
     """
+    t1 = time.clock()
     for i in range(1):
         edp.run_test_case(graphs)
+    t2 = time.clock()
+    print("Elapsed " + str(t2-t1) + "s")
 
-graphs = True
+graphs = False
 profile = False
 
 for edp in test_cases():
@@ -56,13 +60,13 @@ for edp in test_cases():
         profiler = pprofile.Profile()
         with profiler:
             run()
-        profiler.print_stats()
-        with open("profile.stat", 'w') as file:
-            profiler.callgrind(file)
-        # cProfile.run("edp.run_test_case(graphs)", "profile.stat")
-        # p = pstats.Stats('profile.stat')
+        # profiler.print_stats()
+        with open("profile." + edp.name, 'w') as fich:
+            profiler.callgrind(fich)
+        # cProfile.run("edp.run_test_case(graphs)", "profile." + edp.name)
+        # p = pstats.Stats("profile." + edp.name)
         # p.sort_stats('time').print_stats(10)
         # p.sort_stats('cumulative').print_stats(10)
-        # os.remove("profile.stat")
+        # os.remove("profile." + edp.name)
     else:
         run()

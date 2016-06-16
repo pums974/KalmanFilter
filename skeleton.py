@@ -201,6 +201,7 @@ class EDP(object):
     noise_sim = 20.
     dt = 0.
     nIt = 0
+    name = "Skeleton"
 
     def __init__(self):
         self.simulation = SkelSimulation(self.noise_sim, self.dt, [0])

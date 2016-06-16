@@ -135,16 +135,16 @@ class KalmanWrapper(SkelKalmanWrapper):
         self.kalman.R = np.eye(self.kalman.size_o) * self.reality.noiselevel ** 2   # Estimated error in measurements.
 
         indx = self.kalsim.grid.indx
-        G = np.zeros([self.kalman.size_s, 1])
-        for i in range(self.kalsim.grid.nx):
-            for j in range(self.kalsim.grid.ny):
-                # G[indx(i, j)] = self.kalsim.grid.dx ** 4 / 24. \
-                #               + self.kalsim.grid.dy ** 4 / 24. \
-                #               + self.kalsim.dt ** 2 / 2.
-                G[indx(i, j)] = self.kalsim.dt
-
-        self.kalman.Q = G.dot(np.transpose(G)) * self.kalsim.noiselevel ** 2  # Estimated error in process.
-        # self.kalman.Q = np.eye(self.kalman.size_s) * self.kalsim.noiselevel ** 2  # Estimated error in process.
+        # G = np.zeros([self.kalman.size_s, 1])
+        # for i in range(self.kalsim.grid.nx):
+        #     for j in range(self.kalsim.grid.ny):
+        #         # G[indx(i, j)] = self.kalsim.grid.dx ** 4 / 24. \
+        #         #               + self.kalsim.grid.dy ** 4 / 24. \
+        #         #               + self.kalsim.dt ** 2 / 2.
+        #         G[indx(i, j)] = self.kalsim.dt
+        #
+        # self.kalman.Q = G.dot(np.transpose(G)) * self.kalsim.noiselevel ** 2  # Estimated error in process.
+        self.kalman.Q = np.eye(self.kalman.size_s) * self.kalsim.noiselevel ** 2  # Estimated error in process.
 
     def getwindow(self):
         """
@@ -152,25 +152,25 @@ class KalmanWrapper(SkelKalmanWrapper):
         :return: observation matrix
         """
         indx = self.kalsim.grid.indx
-        M = np.eye(self.kalsim.size)
-        # ep = 1
-        # size_o = 2 * ep * self.kalsim.grid.nx + 2 * ep * (self.kalsim.grid.ny - 2 * ep)
-        # M = np.zeros([size_o, self.kalsim.size])
-        # k = 0
-        # for i in range(self.kalsim.grid.nx):
-        #     for j in range(0, ep):
-        #         M[k][indx(i, j)] = 1.
-        #         k += 1
-        #     for j in range(self.kalsim.grid.ny - ep, self.kalsim.grid.ny):
-        #         M[k][indx(i, j)] = 1.
-        #         k += 1
-        # for j in range(ep, self.kalsim.grid.ny - ep):
-        #     for i in range(0, ep):
-        #         M[k][indx(i, j)] = 1.
-        #         k += 1
-        #     for i in range(self.kalsim.grid.nx - ep, self.kalsim.grid.nx):
-        #         M[k][indx(i, j)] = 1.
-        #         k += 1
+        # M = np.eye(self.kalsim.size)
+        ep = 1
+        size_o = 2 * ep * self.kalsim.grid.nx + 2 * ep * (self.kalsim.grid.ny - 2 * ep)
+        M = np.zeros([size_o, self.kalsim.size])
+        k = 0
+        for i in range(self.kalsim.grid.nx):
+            for j in range(0, ep):
+                M[k][indx(i, j)] = 1.
+                k += 1
+            for j in range(self.kalsim.grid.ny - ep, self.kalsim.grid.ny):
+                M[k][indx(i, j)] = 1.
+                k += 1
+        for j in range(ep, self.kalsim.grid.ny - ep):
+            for i in range(0, ep):
+                M[k][indx(i, j)] = 1.
+                k += 1
+            for i in range(self.kalsim.grid.nx - ep, self.kalsim.grid.nx):
+                M[k][indx(i, j)] = 1.
+                k += 1
         return M
 
     def getsol(self):
@@ -199,13 +199,14 @@ class Chaleur(EDP):
     """
     Lx = 2.
     Ly = 3.
-    nx = 10
+    nx = 20
     ny = 20
     power = 2.
-    noise_real = .2
+    noise_real = .3
     noise_sim = .5
     dt = 0.
     nIt = 150
+    name = "Chaleur"
 
     def __init__(self):
         EDP.__init__(self)
@@ -213,7 +214,7 @@ class Chaleur(EDP):
         self.reinit()
         print("cfl = ", max([self.dt / (self.grid.dx ** 2), self.dt / (self.grid.dy ** 2)]))
         print("dt = ", self.dt)
-        print("Norme H1 |  reality  |   simu   |  kalman")
+        print("Norme H1 |  reality |   simu   |  kalman")
 
     def reinit(self):
         """
@@ -319,5 +320,5 @@ class Chaleur(EDP):
 
         # ------------------------ Final output ----------------------------
 
-        print("%8.2e | %8.2e | %8.2e" % (np.max(Sol_ref), np.max(Sol_ref), np.max(Sol_ref)))
+        print("%8.2e | %8.2e | %8.2e | %8.2e" % (Norm_ref, Err_mes, Err_sim, Err_kal))
 

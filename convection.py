@@ -39,12 +39,12 @@ class Reality(SkelReality):
         self.field = np.zeros([self.grid.nx, self.grid.ny])
         self.It += 1
         time = self.It * self.dt
-        width = self.grid.Lx * 0.1
-        x0 = width * math.cos(time * self.dtheta * 0.5)
-        y0 = width * math.sin(time * self.dtheta * 0.5)
+        width = 2.
+        x0 = self.grid.Lx * math.cos(time * self.dtheta * 0.5) * 0.25
+        y0 = self.grid.Lx * math.sin(time * self.dtheta * 0.5) * 0.25
         tmp1 = np.square(self.grid.coordx - x0)
         tmp2 = np.square(self.grid.coordy - y0)
-        self.field = np.maximum(1. - tmp1 - tmp2, self.field)
+        self.field = np.maximum(1. - (tmp1 + tmp2) * width, self.field)
 
 
 class Simulation(SkelSimulation):
@@ -114,7 +114,7 @@ class KalmanWrapper(SkelKalmanWrapper):
     """
     def __init__(self, _reality, _sim):
         SkelKalmanWrapper.__init__(self, _reality, _sim)
-        self.kalman.S = np.eye(self.kalman.size_s) * self.reality.noiselevel ** 2  # Initial covariance estimate.
+        self.kalman.S = np.eye(self.kalman.size_s) * 0.  # Initial covariance estimate.
         self.kalman.R = np.eye(self.kalman.size_o) * self.reality.noiselevel ** 2  # Estimated error in measurements.
 
         indx = self.kalsim.grid.indx
@@ -163,14 +163,16 @@ class Convection(EDP):
     """
     T_fin = 20.
     nIt = 0
-    noise_real = .2
-    noise_sim = 0.
+    noise_real = 0.065
+    noise_sim = 0.007
+    # noise_sim = 0.005
     Lx = 4.
     Ly = 4.
-    nx = 20
-    ny = 20
+    nx = 17
+    ny = 17
     dtheta = 2. * math.pi / 10.
     dt = 0.
+    name = "Convection"
 
     def __init__(self):
         EDP.__init__(self)
@@ -183,7 +185,7 @@ class Convection(EDP):
         maxa = np.max(self.grid.velofield)
         print("cfl = ", maxa * max([self.dt / self.grid.dx, self.dt / self.grid.dy]))
         print("dt = ", self.dt)
-        print("Norme Linf |  reality  |   simu   |  kalman")
+        print("Norme Linf |   simu   |  kalman")
 
     def reinit(self):
         """
@@ -219,7 +221,7 @@ class Convection(EDP):
         :param field: field
         :return: norm H1
         """
-        return self.grid.norm_l2(field)
+        return self.grid.norm_h1(field)
 
     def plot(self, field):
         """
@@ -268,7 +270,7 @@ class Convection(EDP):
         # ------------------------ Compute simulation without Kalman ----------------------------
         self.reality.reinit()
         # Initial solution
-        self.simulation.setsol(self.reality.getsolwithnoise())
+        self.simulation.setsol(self.reality.getsol())
         if graphs:
             self.animate(self.simulation)
         else:
@@ -280,7 +282,7 @@ class Convection(EDP):
         # ------------------------ Compute simulation with Kalman ----------------------------
         self.reality.reinit()
         # Initial solution
-        self.kalman.setsol(self.reality.getsolwithnoise())
+        self.kalman.setsol(self.reality.getsol())
 
         if graphs:
             self.animate(self.kalman)
@@ -292,5 +294,6 @@ class Convection(EDP):
 
         # ------------------------ Final output ----------------------------
 
-        print("%8.2e   | %8.2e | %8.2e" % (np.max(Sol_ref), np.max(Sol_ref), np.max(Sol_ref)))
+        print("%8.2e   | %8.2e | %8.2e" % (np.max(Sol_ref), np.max(Sol_sim), np.max(Sol_kal)))
+        print("%8.2e | %8.2e | %8.2e | %8.2e" % (Norm_ref, Err_mes, Err_sim, Err_kal))
 

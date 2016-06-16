@@ -9,6 +9,11 @@ from matplotlib import animation
 from matplotlib import cm
 from mpl_toolkits.mplot3d import Axes3D
 
+from fortran_libs import derx_df2_f, dery_df2_f, derx_upwind_f, dery_upwind_f
+
+
+use_fortran = True
+
 
 class Grid(object):
     """
@@ -147,7 +152,7 @@ class Grid(object):
 
         _ = animation.FuncAnimation(fig, plot_update, compute(simu), blit=False, interval=10,
                                     repeat=False)
-        _ = plt.show()
+        plt.show()
 
     def animatewithnoise(self, simu, compute, norm):
         """
@@ -246,14 +251,17 @@ class Grid_DF2(Grid):
         :param field: field to be derived
         :return: field derived
         """
-        derx = np.zeros([self.nx, self.ny])
-        for i in range(self.nx):
-            for j in range(self.ny):
-                start = max([0, i - 1])
-                end = min([start + 3, self.nx])
-                start = end - 3
-                for k in range(start, end):
-                    derx[i][j] += field[k][j] * self.mat_derx[i][j][k - start]
+        if use_fortran:
+            derx = derx_df2_f(field, self.mat_derx)
+        else:
+            derx = np.zeros([self.nx, self.ny])
+            for i in range(self.nx):
+                for j in range(self.ny):
+                    start = max([0, i - 1])
+                    end = min([start + 3, self.nx])
+                    start = end - 3
+                    for k in range(start, end):
+                        derx[i][j] += field[k][j] * self.mat_derx[i][j][k - start]
         return derx
 
     def dderx(self, field):
@@ -262,15 +270,17 @@ class Grid_DF2(Grid):
         :param field: field to be derived
         :return: field derived
         """
-        dderx = np.zeros([self.nx, self.ny])
-        for i in range(self.nx):
-            for j in range(self.ny):
-                start = max([0, i - 1])
-                end = min([start + 3, self.nx])
-                start = end - 3
-                for k in range(start, end):
-                    dderx[i][j] += field[k][j] * self.mat_dderx[i][j][k - start]
-
+        if use_fortran:
+            dderx = derx_df2_f(field, self.mat_dderx)
+        else:
+            dderx = np.zeros([self.nx, self.ny])
+            for i in range(self.nx):
+                for j in range(self.ny):
+                    start = max([0, i - 1])
+                    end = min([start + 3, self.nx])
+                    start = end - 3
+                    for k in range(start, end):
+                        dderx[i][j] += field[k][j] * self.mat_dderx[i][j][k - start]
         return dderx
 
     def dery(self, field):
@@ -279,14 +289,17 @@ class Grid_DF2(Grid):
         :param field: field to be derived
         :return: field derived
         """
-        dery = np.zeros([self.nx, self.ny])
-        for i in range(self.nx):
-            for j in range(self.ny):
-                start = max([0, j - 1])
-                end = min([start + 3, self.ny])
-                start = end - 3
-                for k in range(start, end):
-                    dery[i][j] += field[i][k] * self.mat_dery[i][j][k - start]
+        if use_fortran:
+            dery = dery_df2_f(field, self.mat_dery)
+        else:
+            dery = np.zeros([self.nx, self.ny])
+            for i in range(self.nx):
+                for j in range(self.ny):
+                    start = max([0, j - 1])
+                    end = min([start + 3, self.ny])
+                    start = end - 3
+                    for k in range(start, end):
+                        dery[i][j] += field[i][k] * self.mat_dery[i][j][k - start]
         return dery
 
     def ddery(self, field):
@@ -295,15 +308,17 @@ class Grid_DF2(Grid):
         :param field: field to be derived
         :return: field derived
         """
-        ddery = np.zeros([self.nx, self.ny])
-        for i in range(self.nx):
-            for j in range(self.ny):
-                start = max([0, j - 1])
-                end = min([start + 3, self.ny])
-                start = end - 3
-                for k in range(start, end):
-                    ddery[i][j] += field[i][k] * self.mat_ddery[i][j][k - start]
-
+        if use_fortran:
+            ddery = dery_df2_f(field, self.mat_ddery)
+        else:
+            ddery = np.zeros([self.nx, self.ny])
+            for i in range(self.nx):
+                for j in range(self.ny):
+                    start = max([0, j - 1])
+                    end = min([start + 3, self.ny])
+                    start = end - 3
+                    for k in range(start, end):
+                        ddery[i][j] += field[i][k] * self.mat_ddery[i][j][k - start]
         return ddery
 
 
@@ -322,15 +337,19 @@ class Grid_Upwind(Grid):
         :param field: field to be derived
         :return: field derived
         """
-        derx = np.zeros([self.nx, self.ny])
-        for i in range(self.nx):
-            for j in range(self.ny):
-                ap = max([self.velofield[i][j][0], 0.])/2
-                am = min([self.velofield[i][j][0], 0.])/2
-                if i > 0:
-                    derx[i][j] += ap * (field[i][j] - field[i - 1][j]) / self.dx
-                if i < self.nx - 1:
-                    derx[i][j] += am * (field[i + 1][j] - field[i][j]) / self.dx
+        if use_fortran:
+            derx = derx_upwind_f(field, self.velofield, self.dx)
+        else:
+            rdx = 1. / self.dx
+            derx = np.zeros([self.nx, self.ny])
+            for i in range(self.nx):
+                for j in range(self.ny):
+                    ap = max([self.velofield[i][j][0], 0.]) * 0.5
+                    am = min([self.velofield[i][j][0], 0.]) * 0.5
+                    if i > 0:
+                        derx[i][j] += ap * (field[i][j] - field[i - 1][j]) * rdx
+                    if i < self.nx - 1:
+                        derx[i][j] += am * (field[i + 1][j] - field[i][j]) * rdx
         return derx
 
     def dery(self, field):
@@ -339,13 +358,17 @@ class Grid_Upwind(Grid):
         :param field: field to be derived
         :return: field derived
         """
-        dery = np.zeros([self.nx, self.ny])
-        for i in range(self.nx):
-            for j in range(self.ny):
-                ap = max([self.velofield[i][j][1], 0.])/2
-                am = min([self.velofield[i][j][1], 0.])/2
-                if j > 0:
-                    dery[i][j] += ap * (field[i][j] - field[i][j - 1]) / self.dy
-                if j < self.ny - 1:
-                    dery[i][j] += am * (field[i][j + 1] - field[i][j]) / self.dy
+        if use_fortran:
+            dery = dery_upwind_f(field, self.velofield, self.dy)
+        else:
+            rdy = 1. / self.dy
+            dery = np.zeros([self.nx, self.ny])
+            for i in range(self.nx):
+                for j in range(self.ny):
+                    ap = max([self.velofield[i][j][1], 0.]) * 0.5
+                    am = min([self.velofield[i][j][1], 0.]) * 0.5
+                    if j > 0:
+                        dery[i][j] += ap * (field[i][j] - field[i][j - 1]) * rdy
+                    if j < self.ny - 1:
+                        dery[i][j] += am * (field[i][j + 1] - field[i][j]) * rdy
         return dery

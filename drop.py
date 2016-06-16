@@ -124,10 +124,10 @@ class KalmanWrapper(SkelKalmanWrapper):
         self.kalman.S = np.eye(self.kalman.size_s) * 0.  # Initial covariance estimate.
         self.kalman.R = np.eye(self.kalman.size_o) * self.reality.noiselevel ** 2  # Estimated error in measurements.
 
-        G = np.array([[_sim.dt,
-                       _sim.dt ** 2 * 0.5,
-                       _sim.dt,
-                       _sim.dt**2 * 0.5]])
+        G = np.array([[_sim.dt],
+                      [_sim.dt ** 2 * 0.5],
+                      [_sim.dt],
+                      [_sim.dt**2 * 0.5]])
         self.kalman.Q = G.dot(np.transpose(G)) * self.kalsim.noiselevel ** 2   # Estimated error in process.
         # self.kalman.Q = np.eye(self.kalman.size_s) * self.kalsim.noiselevel ** 2  # Estimated error in process.
 
@@ -148,7 +148,7 @@ class KalmanWrapper(SkelKalmanWrapper):
 
         :param field:
         """
-        self.kalman.Y = self.kalman.M.dot(field[..., np.newaxis])
+        self.kalman.Y = self.kalman.M.dot(field)
 
     def getsol(self):
         """
@@ -163,7 +163,7 @@ class KalmanWrapper(SkelKalmanWrapper):
             Set the current solution, we have to add a dummy dimension for the kalman filter
         :param field: field
         """
-        self.kalman.X = field[..., np.newaxis]
+        self.kalman.X = field
         self.kalsim.setsol(field)
 
 
@@ -176,10 +176,11 @@ class Drop(EDP):
         * how to plot the results
     """
     Tfin = 15.
-    nIt = 300
+    nIt = 3000
     noise_real = 20
     noise_sim = 10
     dt = Tfin / nIt
+    name = "Drop"
 
     def __init__(self):
         EDP.__init__(self)

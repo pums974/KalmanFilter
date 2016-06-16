@@ -4,6 +4,10 @@
     This is our implementation of the Kalman filter
 """
 import numpy as np
+from fortran_libs import kalman_apply_f
+
+
+use_fortran = True
 
 
 class KalmanFilter(object):
@@ -30,14 +34,19 @@ class KalmanFilter(object):
         """
             apply the kalman filter
         """
-        # -------------------------Prediction step-----------------------------
-        self.S = self.Phi.dot(self.S).dot(np.transpose(self.Phi)) + self.Q
+        if use_fortran:
+            self.S, X = kalman_apply_f(self.Phi, self.S, self.Q, self.M, self.R, self.Y, self.X)
+            self.X = X.flatten()
+        else:
+            # -------------------------Prediction step-----------------------------
+            self.S = self.Phi.dot(self.S).dot(np.transpose(self.Phi)) + self.Q
 
-        # ------------------------Observation step-----------------------------
-        innovation_covariance = self.M.dot(self.S).dot(np.transpose(self.M)) + self.R
-        innovation = self.Y - self.M.dot(self.X)
+            # ------------------------Observation step-----------------------------
+            innovation_covariance = self.M.dot(self.S).dot(np.transpose(self.M)) + self.R
+            innovation = self.Y - self.M.dot(self.X)
 
-        # ---------------------------Update step-------------------------------
-        K = self.S.dot(np.transpose(self.M)).dot(np.linalg.inv(innovation_covariance))
-        self.X = self.X + K.dot(innovation)
-        self.S = (self.Id - K.dot(self.M)).dot(self.S)
+            # ---------------------------Update step-------------------------------
+            K = self.S.dot(np.transpose(self.M)).dot(np.linalg.inv(innovation_covariance))
+            self.X = self.X + K.dot(innovation)
+
+            self.S = (self.Id - K.dot(self.M)).dot(self.S)
