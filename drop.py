@@ -12,7 +12,6 @@
 from __future__ import print_function
 import math
 import numpy as np
-import matplotlib.pyplot as plt
 from kalman import KalmanFilter
 from skeleton import *
 import random
@@ -176,7 +175,7 @@ class Drop(EDP):
         * how to plot the results
     """
     Tfin = 15.
-    nIt = 3000
+    nIt = 300
     noise_real = 20
     noise_sim = 10
     dt = Tfin / nIt
@@ -211,6 +210,7 @@ class Drop(EDP):
             plot one trajectory
         :param field: field
         """
+        import matplotlib.pyplot as plt
         fig = plt.figure()
         ax = fig.gca()
         plt.xlabel('X position')
@@ -230,6 +230,7 @@ class Drop(EDP):
         :param field_sim: a simulated trajectory
         :param field_kal: a filtered trajectory
         """
+        import matplotlib.pyplot as plt
         fig = plt.figure()
         ax = fig.gca()
         plt.xlabel('X position')

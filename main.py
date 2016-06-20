@@ -38,7 +38,7 @@ def test_cases():
     """
     # yield Drop()
     yield Chaleur()
-    # yield Convection()
+    yield Convection()
 
 
 def run():
@@ -52,7 +52,7 @@ def run():
     t2 = time.clock()
     print("Elapsed " + str(t2-t1) + "s")
 
-graphs = False
+graphs = True
 profile = False
 
 for edp in test_cases():

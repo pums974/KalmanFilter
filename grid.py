@@ -4,12 +4,8 @@
     2D grid with finite difference derivative of second order
 """
 import numpy as np
-import matplotlib.pyplot as plt
-from matplotlib import animation
-from matplotlib import cm
-from mpl_toolkits.mplot3d import Axes3D
-
 from fortran_libs import derx_df2_f, dery_df2_f, derx_upwind_f, dery_upwind_f
+from plot import Animator
 
 
 use_fortran = True
@@ -19,7 +15,6 @@ class Grid(object):
     """
         Generic 2D grid
     """
-
     def __init__(self, _nx, _ny, _lx, _ly):
         self.Lx = _lx
         self.Ly = _ly
@@ -124,69 +119,91 @@ class Grid(object):
 
     def animate(self, simu, compute):
         """
-            Perform the simulation and produce animation a the same time
-        :param simu: the simulation to perform
-        :param compute: the generator to compute time steps
+         truc
+        :param simu:
+        :param compute:
+        :return:
         """
-
-        def plot_update(i):
-            """
-                Update the plot
-            :param i: iteration number
-            :return: surface to be plotted
-            """
-            ax.clear()
-            surf = ax.plot_surface(self.coordx, self.coordy, simu.getsol(), rstride=1,
-                                   cstride=1, cmap=cm.coolwarm, linewidth=0, antialiased=False)
-            ax.set_xlim(-1, 1)
-            ax.set_ylim(-1, 1)
-            ax.set_zlim(-1, 1)
-            ax.set_title('It = ' + str(i) + ',\n err = ' + str(simu.err))
-            return surf,
-
-        fig = plt.figure()
-        ax = fig.gca(projection='3d')
-        ax.set_xlim(-1, 1)
-        ax.set_ylim(-1, 1)
-        ax.set_zlim(-1, 1)
-
-        _ = animation.FuncAnimation(fig, plot_update, compute(simu), blit=False, interval=10,
-                                    repeat=False)
-        plt.show()
+        Animator().animate_mt(self, simu, compute)
 
     def animatewithnoise(self, simu, compute, norm):
         """
-            Perform the simulation and produce animation a the same time
-        :param simu: the simulation to perform
-        :param compute: the generator to compute time steps
-        :param norm: the norm to compute noise norm
+         truc
+        :param simu:
+        :param compute:
+        :return:
         """
+        Animator().animatewithnoise(self, simu, compute, norm)
 
-        def plot_update(i):
-            """
-                Update the plot
-            :param i: iteration number
-            :return: surface to be plotted
-            """
-            ax.clear()
-            surf = ax.plot_surface(self.coordx, self.coordy, simu.getsolwithnoise(), rstride=1,
-                                   cstride=1, cmap=cm.coolwarm, linewidth=0, antialiased=False)
-            simu.err = norm(simu.getsol() - simu.getsolwithnoise())
-            ax.set_xlim(-1, 1)
-            ax.set_ylim(-1, 1)
-            ax.set_zlim(-1, 1)
-            ax.set_title('It = ' + str(i) + ',\n err = ' + str(simu.err))
-            return surf,
+    # def animate(self, simu, compute):
+    #     """
+    #         Perform the simulation and produce animation a the same time
+    #     :param simu: the simulation to perform
+    #     :param compute: the generator to compute time steps
+    #     """
+    #
+    #     def plot_update(i):
+    #         """
+    #             Update the plot
+    #         :param i: iteration number
+    #         :return: surface to be plotted
+    #         """
+    #         ax.clear()
+    #         surf = ax.plot_surface(self.coordx, self.coordy, simu.getsol(), rstride=1,
+    #                                cstride=1, cmap=cm.coolwarm, linewidth=0, antialiased=False)
+    #         ax.set_xlim(-1, 1)
+    #         ax.set_ylim(-1, 1)
+    #         ax.set_zlim(-1, 1)
+    #         ax.set_title('It = ' + str(i) + ',\n err = ' + str(simu.err))
+    #         return surf,
+    #
+    #     fig = plt.figure()
+    #     ax = fig.gca(projection='3d')
+    #     ax.set_xlim(-1, 1)
+    #     ax.set_ylim(-1, 1)
+    #     ax.set_zlim(-1, 1)
+    #
+    #     _ = animation.FuncAnimation(fig, plot_update, compute(simu), blit=False, interval=10,
+    #                                 repeat=False)
+    #     plt.show()
 
-        fig = plt.figure()
-        ax = fig.gca(projection='3d')
-        ax.set_xlim(-1, 1)
-        ax.set_ylim(-1, 1)
-        ax.set_zlim(-1, 1)
-
-        _ = animation.FuncAnimation(fig, plot_update, compute(simu), blit=False, interval=10,
-                                    repeat=False)
-        plt.show()
+    # def animatewithnoise(self, simu, compute, norm):
+    #     """
+    #         Perform the simulation and produce animation a the same time
+    #     :param simu: the simulation to perform
+    #     :param compute: the generator to compute time steps
+    #     :param norm: the norm to compute noise norm
+    #     """
+    #     import matplotlib
+    #     import matplotlib.pyplot as plt
+    #     from matplotlib import animation
+    #     from matplotlib import cm
+    #     from mpl_toolkits.mplot3d import Axes3D
+    #     def plot_update(i):
+    #         """
+    #             Update the plot
+    #         :param i: iteration number
+    #         :return: surface to be plotted
+    #         """
+    #         ax.clear()
+    #         surf = ax.plot_surface(self.coordx, self.coordy, simu.getsolwithnoise(), rstride=1,
+    #                                cstride=1, cmap=cm.coolwarm, linewidth=0, antialiased=False)
+    #         simu.err = norm(simu.getsol() - simu.getsolwithnoise())
+    #         ax.set_xlim(-1, 1)
+    #         ax.set_ylim(-1, 1)
+    #         ax.set_zlim(-1, 1)
+    #         ax.set_title('It = ' + str(i) + ',\n err = ' + str(simu.err))
+    #         return surf,
+    #
+    #     fig = plt.figure()
+    #     ax = fig.gca(projection='3d')
+    #     ax.set_xlim(-1, 1)
+    #     ax.set_ylim(-1, 1)
+    #     ax.set_zlim(-1, 1)
+    #
+    #     _ = animation.FuncAnimation(fig, plot_update, compute(simu), blit=False, interval=10,
+    #                                 repeat=False)
+    #     plt.show()
 
 
 class Grid_DF2(Grid):
