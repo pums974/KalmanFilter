@@ -3,9 +3,10 @@
 """
     This is a skeleton for test case
 """
+from __future__ import print_function, absolute_import
 import random
 import numpy as np
-from kalman import KalmanFilter
+from kalman.kalman import KalmanFilter
 
 
 class SkelReality(object):

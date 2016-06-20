@@ -3,13 +3,17 @@
 """
     2D grid with finite difference derivative of second order
 """
+from __future__ import print_function, absolute_import
 import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib import animation
 from matplotlib import cm
 from mpl_toolkits.mplot3d import Axes3D
-
-from fortran_libs import derx_df2_f, dery_df2_f, derx_upwind_f, dery_upwind_f
+import sys
+if sys.version_info < (3,):
+    from kalman.libs.fortran_libs_py2 import derx_df2_f, dery_df2_f, derx_upwind_f, dery_upwind_f
+else:
+    from kalman.libs.fortran_libs_py3 import derx_df2_f, dery_df2_f, derx_upwind_f, dery_upwind_f
 
 
 use_fortran = True

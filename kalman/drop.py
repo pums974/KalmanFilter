@@ -9,12 +9,12 @@
     The result is one plot
 """
 
-from __future__ import print_function
+from __future__ import print_function, absolute_import
 import math
 import numpy as np
 import matplotlib.pyplot as plt
-from kalman import KalmanFilter
-from skeleton import *
+from kalman.kalman import KalmanFilter
+from kalman.skeleton import *
 import random
 
 

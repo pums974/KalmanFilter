@@ -21,9 +21,10 @@
     * one animation of the simulation during time convergence
     * one animation of the filtered simulation during time convergence
 """
-from drop import Drop
-from chaleur import Chaleur
-from convection import Convection
+from kalman.drop import Drop
+from kalman.chaleur import Chaleur
+from kalman.convection import Convection
+
 # import cProfile
 # import pstats
 # import os
@@ -36,9 +37,9 @@ def test_cases():
     Generator of all the considered test cases
     :return:
     """
-    # yield Drop()
+    yield Drop()
     yield Chaleur()
-    # yield Convection()
+    yield Convection()
 
 
 def run():

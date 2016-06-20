@@ -3,8 +3,13 @@
 """
     This is our implementation of the Kalman filter
 """
+from __future__ import print_function, absolute_import
 import numpy as np
-from fortran_libs import kalman_apply_f
+import sys
+if sys.version_info < (3,):
+    from kalman.libs.fortran_libs_py2 import kalman_apply_f
+else:
+    from kalman.libs.fortran_libs_py3 import kalman_apply_f
 
 
 use_fortran = True

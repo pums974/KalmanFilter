@@ -1,10 +1,10 @@
 #!/usr/bin/python2
 # coding=utf-8
 """
-    Chaleur will solve the problem
-    - lap T = S
+    Convection will solve a simple convection problem
+    dt T + a . grad T = 0
     and use the Kalman filter to mix
-    2st order simulation and noisy measurements
+    1st order upwind simulation and noisy measurements
     In order to produce converged field closer to the analytic solution
     The result is :
     * one plot with the analytic solution
@@ -12,12 +12,14 @@
     * one animation of the simulation during time convergence
     * one animation of the filtered simulation during time convergence
 """
-from __future__ import print_function
+from __future__ import print_function, absolute_import
+
 import numpy as np
 
-from kalman import KalmanFilter
-from skeleton import *
-from grid import Grid_DF2
+from kalman.kalman import KalmanFilter
+from kalman.skeleton import *
+from kalman.grid import Grid_Upwind
+import math
 
 
 class Reality(SkelReality):
@@ -26,11 +28,10 @@ class Reality(SkelReality):
         It also provide way to get a noisy field around this solution
     """
     # ---------------------------------METHODS-----------------------------------
-
-    def __init__(self, _grid, _power, _noiselevel, _dt):
+    def __init__(self, _grid, _dtheta, _noiselevel, _dt):
         self.grid = _grid
         SkelReality.__init__(self, _noiselevel, _dt, _grid.shape)
-        self.power = _power
+        self.dtheta = _dtheta
 
     def step(self):
         """
@@ -39,10 +40,12 @@ class Reality(SkelReality):
         self.field = np.zeros([self.grid.nx, self.grid.ny])
         self.It += 1
         time = self.It * self.dt
-        for i in range(self.grid.nx):
-            for j in range(self.grid.ny):
-                self.field[i][j] = 1. - self.power * (
-                    (self.grid.coordx[i][j]) ** 2 + (self.grid.coordy[i][j]) ** 2) / 4.
+        width = 2.
+        x0 = self.grid.Lx * math.cos(time * self.dtheta * 0.5) * 0.25
+        y0 = self.grid.Lx * math.sin(time * self.dtheta * 0.5) * 0.25
+        tmp1 = np.square(self.grid.coordx - x0)
+        tmp2 = np.square(self.grid.coordy - y0)
+        self.field = np.maximum(1. - (tmp1 + tmp2) * width, self.field)
 
 
 class Simulation(SkelSimulation):
@@ -50,32 +53,31 @@ class Simulation(SkelSimulation):
     This class contains everything for the simulation
     """
     # --------------------------------PARAMETERS--------------------------------
-    cfl = 1. / 4.
+    cfl = 1. / 2.
 
     # ---------------------------------METHODS-----------------------------------
-    def __init__(self, _grid, _power, _noiselevel):
+    def __init__(self, _grid, _noiselevel):
         self.grid = _grid
-        self.dt = min([self.grid.dx ** 2, self.grid.dy ** 2]) * self.cfl
+        maxa = np.max(_grid.velofield)
+        self.dt = self.cfl * min([_grid.dx, _grid.dy]) / maxa
 
-        SkelSimulation.__init__(self, _noiselevel, self.dt, self.grid.shape)
-        self.power = _power
+        SkelSimulation.__init__(self, _noiselevel, self.dt, _grid.shape)
+
         nx = _grid.nx
         ny = _grid.ny
-
         indx = self.grid.indx
         # compute matrix
         # time
         self.Mat = np.eye(self.size, self.size)
-        # Laplacien
+        # Updwind
         for i in range(nx):
             for j in range(ny):
                 self.field = np.zeros([nx, ny])
                 self.field[i, j] = self.dt
-                self.Mat[indx(i, j)] += np.reshape(self.grid.dderx(self.field), [self.size])
-                self.Mat[indx(i, j)] += np.reshape(self.grid.ddery(self.field), [self.size])
+                self.Mat[indx(i, j)] -= np.reshape(self.grid.derx(self.field), [self.size])
+                self.Mat[indx(i, j)] -= np.reshape(self.grid.dery(self.field), [self.size])
         self.Mat = self.Mat.transpose()
         # rhs and boundary conditions
-        self.rhs = np.zeros([self.size]) + self.power * self.dt
         for j in range(ny):
             self.Mat[indx(0, j)] = np.zeros([self.size])
             self.Mat[indx(nx - 1, j)] = np.zeros([self.size])
@@ -106,21 +108,6 @@ class Simulation(SkelSimulation):
         """
         self.field = np.reshape(field, [self.size])
 
-    def step(self):
-        """
-            Increment through the next time step of the simulation.
-        """
-        indx = self.grid.indx
-        power = np.random.normal(self.power, self.noiselevel, self.rhs.shape)
-        self.rhs = np.zeros([self.size]) + power * self.dt
-        for j in range(self.grid.ny):
-            self.rhs[indx(0, j)] = 0.
-            self.rhs[indx(self.grid.nx - 1, j)] = 0.
-        for i in range(self.grid.nx):
-            self.rhs[indx(i, 0)] = 0.
-            self.rhs[indx(i, self.grid.ny - 1)] = 0.
-        SkelSimulation.step(self)
-
 
 class KalmanWrapper(SkelKalmanWrapper):
     """
@@ -128,21 +115,16 @@ class KalmanWrapper(SkelKalmanWrapper):
     """
     def __init__(self, _reality, _sim):
         SkelKalmanWrapper.__init__(self, _reality, _sim)
-        self.size = self.kalsim.size
-        _M = self.getwindow()  # Observation matrix.
-        self.kalman = KalmanFilter(self.kalsim, _M)
-        self.kalman.S = np.eye(self.kalman.size_s) * self.reality.noiselevel ** 2   # Initial covariance estimate.
-        self.kalman.R = np.eye(self.kalman.size_o) * self.reality.noiselevel ** 2   # Estimated error in measurements.
+        self.kalman.S = np.eye(self.kalman.size_s) * 0.  # Initial covariance estimate.
+        self.kalman.R = np.eye(self.kalman.size_o) * self.reality.noiselevel ** 2  # Estimated error in measurements.
 
         indx = self.kalsim.grid.indx
         # G = np.zeros([self.kalman.size_s, 1])
         # for i in range(self.kalsim.grid.nx):
         #     for j in range(self.kalsim.grid.ny):
-        #         # G[indx(i, j)] = self.kalsim.grid.dx ** 4 / 24. \
-        #         #               + self.kalsim.grid.dy ** 4 / 24. \
-        #         #               + self.kalsim.dt ** 2 / 2.
-        #         G[indx(i, j)] = self.kalsim.dt
-        #
+        #         G[indx(i, j)] = self.kalsim.grid.dx ** 2 / 2. \
+        #                         + self.kalsim.grid.dy ** 2 / 2. \
+        #                         + self.kalsim.dt ** 2 / 2.
         # self.kalman.Q = G.dot(np.transpose(G)) * self.kalsim.noiselevel ** 2  # Estimated error in process.
         self.kalman.Q = np.eye(self.kalman.size_s) * self.kalsim.noiselevel ** 2  # Estimated error in process.
 
@@ -151,26 +133,9 @@ class KalmanWrapper(SkelKalmanWrapper):
             Produce the observation matrix : designate what we conserve of the noisy field
         :return: observation matrix
         """
+
         indx = self.kalsim.grid.indx
-        # M = np.eye(self.kalsim.size)
-        ep = 1
-        size_o = 2 * ep * self.kalsim.grid.nx + 2 * ep * (self.kalsim.grid.ny - 2 * ep)
-        M = np.zeros([size_o, self.kalsim.size])
-        k = 0
-        for i in range(self.kalsim.grid.nx):
-            for j in range(0, ep):
-                M[k][indx(i, j)] = 1.
-                k += 1
-            for j in range(self.kalsim.grid.ny - ep, self.kalsim.grid.ny):
-                M[k][indx(i, j)] = 1.
-                k += 1
-        for j in range(ep, self.kalsim.grid.ny - ep):
-            for i in range(0, ep):
-                M[k][indx(i, j)] = 1.
-                k += 1
-            for i in range(self.kalsim.grid.nx - ep, self.kalsim.grid.nx):
-                M[k][indx(i, j)] = 1.
-                k += 1
+        M = np.eye(self.kalsim.size)
         return M
 
     def getsol(self):
@@ -189,7 +154,7 @@ class KalmanWrapper(SkelKalmanWrapper):
         self.kalsim.setsol(field)
 
 
-class Chaleur(EDP):
+class Convection(EDP):
     """
         This class contains everything for this test case :
         * The analytical solution
@@ -197,35 +162,43 @@ class Chaleur(EDP):
         * A filtered simulation
         * how to plot the results
     """
-    Lx = 2.
-    Ly = 3.
-    nx = 20
-    ny = 20
-    power = 2.
-    noise_real = .3
-    noise_sim = .5
+    T_fin = 20.
+    nIt = 0
+    noise_real = 0.065
+    noise_sim = 0.007
+    # noise_sim = 0.005
+    Lx = 4.
+    Ly = 4.
+    nx = 17
+    ny = 17
+    dtheta = 2. * math.pi / 10.
     dt = 0.
-    nIt = 150
-    name = "Chaleur"
+    name = "Convection"
 
     def __init__(self):
         EDP.__init__(self)
-        self.grid = Grid_DF2(self.nx, self.ny, self.Lx, self.Ly)
+        self.grid = Grid_Upwind(self.nx, self.ny, self.Lx, self.Ly)
+        for i in range(self.nx):
+            for j in range(self.ny):
+                self.grid.velofield[i][j][0] = - self.grid.coordy[i][j] * self.dtheta
+                self.grid.velofield[i][j][1] = self.grid.coordx[i][j] * self.dtheta
         self.reinit()
-        print("cfl = ", max([self.dt / (self.grid.dx ** 2), self.dt / (self.grid.dy ** 2)]))
+        maxa = np.max(self.grid.velofield)
+        print("cfl = ", maxa * max([self.dt / self.grid.dx, self.dt / self.grid.dy]))
         print("dt = ", self.dt)
-        print("Norme H1 |  reality |   simu   |  kalman")
+        print("Norme Linf |   simu   |  kalman")
 
     def reinit(self):
         """
             Reinit everything
         :return:
         """
-        self.simulation = Simulation(self.grid, self.power, self.noise_sim)
-        self.kalsim = Simulation(self.grid, self.power, self.noise_sim)
+        self.simulation = Simulation(self.grid, self.noise_sim)
+        self.kalsim = Simulation(self.grid, self.noise_sim)
 
         self.dt = self.simulation.dt
-        self.reality = Reality(self.grid, self.power, self.noise_real, self.dt)
+        self.nIt = int(self.T_fin / self.dt) + 1
+        self.reality = Reality(self.grid, self.dtheta, self.noise_real, self.dt)
 
         self.simulation.nIt = self.nIt
         self.kalsim.nIt = self.nIt
@@ -263,6 +236,7 @@ class Chaleur(EDP):
             Perform the simulation and produce animation a the same time
         :param simu: the simulation to perform
         """
+
         self.grid.animate(simu, self.compute)
 
     def animatewithnoise(self, simu):
@@ -270,6 +244,7 @@ class Chaleur(EDP):
             Perform the simulation and produce animation a the same time
         :param simu: the simulation to perform
         """
+
         self.grid.animatewithnoise(simu, self.compute, self.norm)
 
     def run_test_case(self, graphs):
@@ -296,7 +271,7 @@ class Chaleur(EDP):
         # ------------------------ Compute simulation without Kalman ----------------------------
         self.reality.reinit()
         # Initial solution
-        self.simulation.setsol(self.reality.getsolwithnoise())
+        self.simulation.setsol(self.reality.getsol())
         if graphs:
             self.animate(self.simulation)
         else:
@@ -308,7 +283,7 @@ class Chaleur(EDP):
         # ------------------------ Compute simulation with Kalman ----------------------------
         self.reality.reinit()
         # Initial solution
-        self.kalman.setsol(self.reality.getsolwithnoise())
+        self.kalman.setsol(self.reality.getsol())
 
         if graphs:
             self.animate(self.kalman)
@@ -320,5 +295,6 @@ class Chaleur(EDP):
 
         # ------------------------ Final output ----------------------------
 
+        print("%8.2e   | %8.2e | %8.2e" % (np.max(Sol_ref), np.max(Sol_sim), np.max(Sol_kal)))
         print("%8.2e | %8.2e | %8.2e | %8.2e" % (Norm_ref, Err_mes, Err_sim, Err_kal))
 
