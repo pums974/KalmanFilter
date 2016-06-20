@@ -1,0 +1,6 @@
+ifort + MKL
+f2py2 -lmkl_intel_lp64 -lmkl_core -lmkl_sequential -lpthread -lm -lmkl_avx -lmkl_def -c fortran_libs.f90 -m fortran_libs --opt="-xHost -Ofast -qopenmp -static -qopt-report=5 -qopt-report-file=stdout" --fcompiler="intelem" --noarch
+
+gfortran + lapack
+f2py2 -L/usr/lib/lapack -llapack -c fortran_libs.f90 -m fortran_libs --opt="-march=native -Ofast"
+
