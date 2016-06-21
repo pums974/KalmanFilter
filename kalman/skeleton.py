@@ -6,7 +6,19 @@
 from __future__ import print_function, absolute_import
 import random
 import numpy as np
+import sys
 from kalman.kalman import KalmanFilter
+from kalman.tools import gc_clean
+
+if sys.version_info < (3,):
+    from kalman.libs.fortran_libs_py2 import gauss_f
+else:
+    from kalman.libs.fortran_libs_py3 import gauss_f
+
+use_fortran = True
+
+if sys.version_info < (3,):
+    range = xrange
 
 
 class SkelReality(object):
@@ -29,6 +41,7 @@ class SkelReality(object):
         self.addnoisev = np.vectorize(self.addnoise)
         self.size = np.prod(_shape)
         self.field = np.zeros(_shape)
+        gc_clean()
 
     def getsol(self):
         """
@@ -55,7 +68,11 @@ class SkelReality(object):
         #     field_with_noise[i] = random.gauss(self.field[i], self.noiselevel)
         # field_with_noise = np.array([random.gauss(d, self.noiselevel)
         #                              for d in self.field.flat]).reshape(self.field.shape)
-        return self.addnoisev(self.field)
+        # return self.addnoisev(self.field)
+        if use_fortran:
+            return gauss_f(self.field.flat, self.noiselevel).reshape(self.field.shape)
+        else:
+            return self.addnoisev(self.field)
 
     def compute(self):
         """
@@ -99,6 +116,7 @@ class SkelSimulation(object):
         self.field = np.zeros(_shape)
         self.Mat = np.zeros(self.size)
         self.rhs = np.zeros(self.size)
+        gc_clean()
 
     def getsol(self):
         """
@@ -147,6 +165,7 @@ class SkelKalmanWrapper(object):
         self.kalman.S = np.eye(self.kalman.size_s) * self.reality.noiselevel ** 2   # Initial covariance estimate.
         self.kalman.R = np.eye(self.kalman.size_o) * self.reality.noiselevel ** 2   # Estimated error in measurements.
         self.kalman.Q = np.eye(self.kalman.size_s) * self.kalsim.noiselevel ** 2    # Estimated error in process.
+        gc_clean()
 
     def getwindow(self):
         """
@@ -210,6 +229,7 @@ class EDP(object):
         self.dt = self.simulation.dt
         self.reality = SkelReality(self.noise_real, self.dt, [0])
         self.kalman = SkelKalmanWrapper(self.reality, self.kalsim)
+        gc_clean()
 
     def compute(self, simu):
         """

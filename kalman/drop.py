@@ -17,6 +17,9 @@ from kalman.kalman import KalmanFilter
 from kalman.skeleton import *
 import random
 
+if sys.version_info < (3,):
+    range = xrange
+
 
 class Reality(SkelReality):
     """
@@ -290,3 +293,6 @@ class Drop(EDP):
         print("%8.2e | %8.2e | %8.2e | %8.2e" % (Norm_ref, Err_mes, Err_sim, Err_kal))
         if graphs:
             self.plotall(Sol_ref, Sol_mes, Sol_sim, Sol_kal)
+
+if __name__ == "__main__":
+    Drop().run_test_case(False)

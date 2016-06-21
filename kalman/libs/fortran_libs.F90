@@ -54,8 +54,8 @@ subroutine derx_upwind_f(field, derx, velofield,dx, n, m)
   derx = 0.
   do j = 1,m
     do i = 1,n
-        ap = max(velofield(i,j,1), 0.)*0.5
-        am = min(velofield(i,j,1), 0.)*0.5
+        ap = max(velofield(i,j,1), 0.d0)*0.5d0
+        am = min(velofield(i,j,1), 0.d0)*0.5d0
         if (i > 1) &
             derx(i,j) = derx(i,j) + ap * (field(i,j) - field(i-1,j)) * rdx
         if (i < n) &
@@ -77,8 +77,8 @@ subroutine dery_upwind_f(field, dery, velofield,dy, n, m)
   dery = 0.
   do j = 1,m
     do i = 1,n
-        ap = max(velofield(i,j,2), 0.)*0.5
-        am = min(velofield(i,j,2), 0.)*0.5
+        ap = max(velofield(i,j,2), 0.d0)*0.5
+        am = min(velofield(i,j,2), 0.d0)*0.5
         if (j > 1) &
             dery(i,j) = dery(i,j) + ap * (field(i,j) - field(i,j-1)) * rdy
         if (j < n) &
@@ -94,27 +94,56 @@ subroutine kalman_apply_f(Phi, S1, Q, M, R, Y, X1,s,x,n1,n2)
   double precision ,intent(in):: S1(n1,n1),X1(n1,1)
   double precision,intent(out):: S(n1,n1),X(n1,1)
 
-  double precision :: innovation_covariance(n2,n2) , innovation(n2,1), Id(n1,n1), k(n1,n2)
+  double precision,allocatable :: innovation_covariance(:,:) , innovation(:,:), Id(:,:), k(:,:)
+  double precision,allocatable :: innovation_covariance0(:,:), innovation0(:,:), S0(:,:), k0(:,:), x0(:,:)
   integer :: i,INFO
+    allocate(innovation_covariance(n2,n2) , innovation(n2,1), Id(n1,n1), k(n1,n2))
+    allocate(innovation_covariance0(n2,n2), innovation0(n2,1), S0(n1,n1), k0(n1,n2), x0(n1,1))
+!      Id=0.
+!      do i = 1,n1
+!        Id(i,i)=1.
+!      enddo
+      
+      ! -------------------------Prediction step-----------------------------
+!      S = matmul(Phi,matmul(S1,transpose(Phi))) + Q
+      S = transpose(Phi)
+      S0  = matmul(S1,S)
+      S = matmul(Phi,S0)
+      S0 = S + Q
 
-      Id=0.
-      do i = 1,n1
-        Id(i,i)=1.
-      enddo
+      ! ------------------------Observation step-----------------------------
+!      innovation_covariance = matmul(M,matmul(S,transpose(M))) + R
+      k0 = transpose(M)
+      K = matmul(S0,k0)
+      innovation_covariance0 = matmul(M,k)
+      innovation_covariance = innovation_covariance0 + R
 
-          ! -------------------------Prediction step-----------------------------
-      S = matmul(Phi,matmul(S1,transpose(Phi))) + Q
+!      innovation = Y - matmul(M,X1)
+      innovation0 = matmul(M,X1)
+      innovation = Y - innovation0
 
-           ! ------------------------Observation step-----------------------------
-      innovation_covariance = matmul(M,matmul(S,transpose(M))) + R
-      innovation = Y - matmul(M,X1)
 
       ! ---------------------------Update step-------------------------------
-      innovation_covariance = inv(innovation_covariance)
-      k = matmul(s,matmul(transpose(m),innovation_covariance))
-      x = x1 + matmul(k,innovation)
-      s = matmul(Id - matmul(k,m),s)
+      innovation_covariance0 = inv(innovation_covariance)
+!      k = matmul(s,matmul(transpose(m),innovation_covariance))
+      k = transpose(M)
+      k0 = matmul(k,innovation_covariance0)
+      k = matmul(s0,k0)
       
+!      x = x1 + matmul(k,innovation)
+      x0 = matmul(k,innovation)
+      x = x1 + x0
+      
+!      s = matmul(Id - matmul(k,m),s)
+      Id = - matmul(k,m)
+      do i = 1,n1
+        Id(i,i)=1. + Id(i,i)
+      enddo
+      s = matmul(Id,s0)
+            
+
+      deallocate(innovation_covariance, innovation, Id, k)
+      deallocate(innovation_covariance0, innovation0, S0, k0, x0)
     
 contains
 
@@ -173,6 +202,7 @@ contains
 
 ! Wrapper around dgemm
 function matmul(A,B,C,ta,tb) result(AB)
+implicit none
   double precision, dimension(:,:), intent(in) :: A,B
   double precision, dimension(:,:), intent(in),optional :: C
   double precision, allocatable :: AB(:,:)
@@ -228,12 +258,17 @@ end function matmul
 ! Returns the inverse of a matrix calculated by finding the LU
 ! decomposition.  Depends on LAPACK.
 function inv(A) result(Ainv)
+implicit none
   double precision, dimension(:,:), intent(in) :: A
-  double precision, dimension(size(A,1),size(A,2)) :: Ainv
+  double precision, allocatable :: Ainv(:,:)
 
-  double precision, dimension(size(A,1)) :: work  ! work array for LAPACK
-  integer, dimension(size(A,1)) :: ipiv   ! pivot indices
+  double precision, allocatable :: work(:)  ! work array for LAPACK
+  integer, allocatable :: ipiv(:)   ! pivot indices
   integer :: n, info
+
+
+  allocate(Ainv(size(A,1),size(A,2)),work(size(A,1)),ipiv(size(A,1)))
+
 
   ! Store A in Ainv to prevent it from being overwritten by LAPACK
   Ainv = A
@@ -254,7 +289,43 @@ function inv(A) result(Ainv)
   if (info /= 0) then
      stop 'Matrix inversion failed!'
   end if
+  
+  deallocate(work,ipiv)
 end function inv
 
 end subroutine kalman_apply_f
 
+subroutine gauss_f(mu, dev, out, n)
+#ifdef __INTEL_COMPILER
+use IFPORT
+#endif
+implicit none
+  integer,intent(in) :: n
+  double precision, dimension(n), intent(in) :: mu
+  double precision, dimension(n), intent(out) :: out
+  double precision, intent(in) :: dev
+  double precision,parameter :: TWOPI = 2.*acos(-1.)
+  double precision,allocatable :: x2pi(:),g2rad(:)
+  logical,save :: init = .false.
+  integer,parameter :: myseed = 86456
+  integer :: m,i
+
+  if(.not.init) then
+     call srand(myseed)
+     init = .true.
+  endif
+
+    m = ceiling(n/2.)
+    allocate(x2pi(m),g2rad(m))
+      do i = 1,m
+        x2pi(i) = rand() * TWOPI
+        g2rad(i) = sqrt(-2.d0 * log(1.d0 - rand()))
+      enddo
+      do i = 1,size(mu),2
+        out(i) = mu(i) + cos(x2pi(ceiling(i/2.))) * g2rad(ceiling(i/2.)) * dev
+      enddo
+      do i = 2,size(mu),2
+        out(i) = mu(i) + sin(x2pi(ceiling(i/2.))) * g2rad(ceiling(i/2.)) * dev
+      enddo
+      deallocate(x2pi,g2rad)
+end subroutine gauss_f

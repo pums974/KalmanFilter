@@ -18,8 +18,12 @@ import numpy as np
 from kalman.kalman import KalmanFilter
 from kalman.skeleton import *
 from kalman.grid import Grid_DF2
+from kalman.tools import gc_clean
 import math
 import sys
+
+if sys.version_info < (3,):
+    range = xrange
 
 
 class Reality(SkelReality):
@@ -54,6 +58,10 @@ class Reality(SkelReality):
                         add[i][j] = c10 * math.sin(c20 * x) \
                                         * math.sin(c30 * y)
                 self.initfield += add
+                # print(m, n, self.grid.norm_h1(add))
+                # if self.grid.norm_h1(add) < 0.001:
+                #     break
+        gc_clean()
 
     def step(self):
         """
@@ -64,20 +72,11 @@ class Reality(SkelReality):
         time = self.It * self.dt
         c4 = math.pi * math.pi / (4. * self.grid.Ly ** 2)
         c5 = math.pi * math.pi / (self.grid.Lx ** 2)
-        add = np.zeros([self.grid.nx, self.grid.ny])
         for m in range(1, self.nmode+1):
             for n in range(1, self.mmode+1):
                 c40 = c4 * (2. * n - 1.) ** 2
                 c50 = c5 * (2. * m - 1.) ** 2
-                for i in range(self.grid.nx):
-                    for j in range(self.grid.ny):
-                        add[i][j] = self.initfield[i][j] * math.exp(-(c40 + c50) * time)
-                self.field += add
-                # print(m, n, self.grid.norm_h1(add))
-                # if self.grid.norm_h1(add) < 0.001:
-                #     break
-
-                # self.field[i][j] = 1.
+                self.field = self.initfield * math.exp(-(c40 + c50) * time)
 
 
 class Simulation(SkelSimulation):
@@ -103,6 +102,7 @@ class Simulation(SkelSimulation):
 
         self.field = np.zeros([self.size])
         self.calcbc()
+        gc_clean()
 
     def calcmat(self):
         """
@@ -251,6 +251,7 @@ class KalmanWrapper(SkelKalmanWrapper):
         #
         # self.kalman.Q = G.dot(np.transpose(G)) * self.kalsim.noiselevel ** 2  # Estimated error in process.
         self.kalman.Q = np.eye(self.kalman.size_s) * self.kalsim.noiselevel ** 2  # Estimated error in process.
+        gc_clean()
 
     def getwindow(self):
         """
@@ -320,6 +321,8 @@ class Chaleur(EDP):
         self.grid.coordx += self.grid.Lx / 2.
         self.grid.coordy += self.grid.Ly / 2.
         self.reinit()
+        gc_clean()
+
         print("cfl = ", max([self.dt / (self.grid.dx ** 2), self.dt / (self.grid.dy ** 2)]))
         print("dt = ", self.dt)
         print("Norme H1 |  reality |   simu   |  kalman")
@@ -435,3 +438,5 @@ class Chaleur(EDP):
         Err_kal = self.grid.norm_inf(Sol_kal)
         print("%8.2e | %8.2e | %8.2e | %8.2e" % (Norm_ref, Err_mes, Err_sim, Err_kal))
 
+if __name__ == "__main__":
+    Chaleur().run_test_case(False)

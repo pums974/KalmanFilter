@@ -21,15 +21,28 @@
     * one animation of the simulation during time convergence
     * one animation of the filtered simulation during time convergence
 """
-from kalman.drop import Drop
-from kalman.chaleur import Chaleur
-from kalman.convection import Convection
-
 # import cProfile
 # import pstats
 # import os
-import pprofile
 import time
+import sys
+
+Drop = True
+Chaleur = True
+Convection = True
+graphs = True
+profiling = False
+if profiling:
+    import pprofile
+if Drop:
+    from kalman.drop import Drop
+if Chaleur:
+    from kalman.chaleur import Chaleur
+if Convection:
+    from kalman.convection import Convection
+
+if sys.version_info < (3,):
+    range = xrange
 
 
 def test_cases():
@@ -37,12 +50,15 @@ def test_cases():
     Generator of all the considered test cases
     :return:
     """
-    # yield Drop()
-    yield Chaleur()
-    # yield Convection()
+    if Drop:
+        yield Drop()
+    if Chaleur:
+        yield Chaleur()
+    if Convection:
+        yield Convection()
 
 
-def run():
+def run_a_test_case(edp):
     """
         Do we run the tests cases multiple time ?
     :return:
@@ -53,21 +69,27 @@ def run():
     t2 = time.clock()
     print("Elapsed " + str(t2-t1) + "s")
 
-graphs = False
-profile = False
 
-for edp in test_cases():
-    if profile:
-        profiler = pprofile.Profile()
-        with profiler:
-            run()
-        # profiler.print_stats()
-        with open("profile." + edp.name, 'w') as fich:
-            profiler.callgrind(fich)
-        # cProfile.run("edp.run_test_case(graphs)", "profile." + edp.name)
-        # p = pstats.Stats("profile." + edp.name)
-        # p.sort_stats('time').print_stats(10)
-        # p.sort_stats('cumulative').print_stats(10)
-        # os.remove("profile." + edp.name)
-    else:
-        run()
+def run_all_tests_cases():
+    """
+        Run all the test cases
+    :return:
+    """
+    for edp in test_cases():
+        if profiling:
+            profiler = pprofile.Profile()
+            with profiler:
+                run_a_test_case(edp)
+            # profiler.print_stats()
+            with open("profile." + edp.name, 'w') as fich:
+                profiler.callgrind(fich)
+            # cProfile.run("edp.run_test_case(graphs)", "profile." + edp.name)
+            # p = pstats.Stats("profile." + edp.name)
+            # p.sort_stats('time').print_stats(10)
+            # p.sort_stats('cumulative').print_stats(10)
+            # os.remove("profile." + edp.name)
+        else:
+            run_a_test_case(edp)
+
+if __name__ == "__main__":
+    run_all_tests_cases()

@@ -21,6 +21,9 @@ from kalman.skeleton import *
 from kalman.grid import Grid_Upwind
 import math
 
+if sys.version_info < (3,):
+    range = xrange
+
 
 class Reality(SkelReality):
     """
@@ -298,3 +301,5 @@ class Convection(EDP):
         print("%8.2e   | %8.2e | %8.2e" % (np.max(Sol_ref), np.max(Sol_sim), np.max(Sol_kal)))
         print("%8.2e | %8.2e | %8.2e | %8.2e" % (Norm_ref, Err_mes, Err_sim, Err_kal))
 
+if __name__ == "__main__":
+    Convection().run_test_case(False)

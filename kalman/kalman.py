@@ -7,13 +7,17 @@ from __future__ import print_function, absolute_import
 import numpy as np
 import sys
 import matplotlib.pyplot as plt
+from kalman.tools import gc_clean
+
 if sys.version_info < (3,):
     from kalman.libs.fortran_libs_py2 import kalman_apply_f
 else:
     from kalman.libs.fortran_libs_py3 import kalman_apply_f
 
-
 use_fortran = True
+
+if sys.version_info < (3,):
+    range = xrange
 
 
 class KalmanFilter(object):
@@ -37,6 +41,7 @@ class KalmanFilter(object):
         self.Id = np.eye(self.size_s)
         self.counter = 0
         self.counterplot = -1
+        gc_clean()
 
     @staticmethod
     def plot_matrix(matrix):
