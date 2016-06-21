@@ -176,7 +176,7 @@ class Drop(EDP):
         * how to plot the results
     """
     Tfin = 15.
-    nIt = 3000
+    nIt = 300
     noise_real = 20
     noise_sim = 10
     dt = Tfin / nIt

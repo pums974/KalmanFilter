@@ -6,6 +6,7 @@
 from __future__ import print_function, absolute_import
 import numpy as np
 import sys
+import matplotlib.pyplot as plt
 if sys.version_info < (3,):
     from kalman.libs.fortran_libs_py2 import kalman_apply_f
 else:
@@ -34,12 +35,33 @@ class KalmanFilter(object):
         self.X = np.zeros(self.size_s)
         self.Y = np.zeros(self.size_o)
         self.Id = np.eye(self.size_s)
+        self.counter = 0
+        self.counterplot = -1
+
+    @staticmethod
+    def plot_matrix(matrix):
+        """
+        Plot a matrix
+        :param matrix:
+        :return:
+        """
+        fig = plt.figure()
+        ax = fig.add_subplot(1, 1, 1)
+        # ax.set_aspect('equal')
+        plt.imshow(matrix, interpolation='nearest', cmap=plt.cm.coolwarm)
+        # labelsx = range(0, len(matrix[0]), int(len(matrix[0])/10))
+        # labelsy = range(0, len(matrix[1]), int(len(matrix[1])/10))
+        # plt.xticks(labelsx)
+        # plt.yticks(labelsy)
+        plt.colorbar()
+        plt.show()
 
     def apply(self):
         """
             apply the kalman filter
         """
-        if use_fortran:
+        self.counter += 1
+        if use_fortran and self.counter != self.counterplot:
             self.S, X = kalman_apply_f(self.Phi, self.S, self.Q, self.M, self.R, self.Y, self.X)
             self.X = X.flatten()
         else:
@@ -55,3 +77,6 @@ class KalmanFilter(object):
             self.X = self.X + K.dot(innovation)
 
             self.S = (self.Id - K.dot(self.M)).dot(self.S)
+
+            if self.counter == self.counterplot:
+                self.plot_matrix(self.S)

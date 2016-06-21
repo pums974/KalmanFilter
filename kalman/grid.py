@@ -118,9 +118,9 @@ class Grid(object):
         """
         fig = plt.figure()
         ax = fig.gca(projection='3d')
-        ax.set_xlim(-1, 1)
-        ax.set_ylim(-1, 1)
-        ax.set_zlim(-1, 1)
+        ax.set_xlim(self.coordx[1, 1], self.coordx[self.nx-1, self.ny-1])
+        ax.set_ylim(self.coordy[1, 1], self.coordy[self.nx-1, self.ny-1])
+        ax.set_zlim(0, 1)
         surf = ax.plot_surface(self.coordx, self.coordy, field, rstride=1,
                                cstride=1, cmap=cm.coolwarm, linewidth=0, antialiased=False)
         fig.colorbar(surf, shrink=0.5, aspect=5)
@@ -142,17 +142,17 @@ class Grid(object):
             ax.clear()
             surf = ax.plot_surface(self.coordx, self.coordy, simu.getsol(), rstride=1,
                                    cstride=1, cmap=cm.coolwarm, linewidth=0, antialiased=False)
-            ax.set_xlim(-1, 1)
-            ax.set_ylim(-1, 1)
-            ax.set_zlim(-1, 1)
+            ax.set_xlim(self.coordx[1, 1], self.coordx[self.nx-1, self.ny-1])
+            ax.set_ylim(self.coordy[1, 1], self.coordy[self.nx-1, self.ny-1])
+            ax.set_zlim(0, 1)
             ax.set_title('It = ' + str(i) + ',\n err = ' + str(simu.err))
             return surf,
 
         fig = plt.figure()
         ax = fig.gca(projection='3d')
-        ax.set_xlim(-1, 1)
-        ax.set_ylim(-1, 1)
-        ax.set_zlim(-1, 1)
+        ax.set_xlim(self.coordx[1, 1], self.coordx[self.nx-1, self.ny-1])
+        ax.set_ylim(self.coordy[1, 1], self.coordy[self.nx-1, self.ny-1])
+        ax.set_zlim(0, 1)
 
         _ = animation.FuncAnimation(fig, plot_update, compute(simu), blit=False, interval=10,
                                     repeat=False)
@@ -176,17 +176,17 @@ class Grid(object):
             surf = ax.plot_surface(self.coordx, self.coordy, simu.getsolwithnoise(), rstride=1,
                                    cstride=1, cmap=cm.coolwarm, linewidth=0, antialiased=False)
             simu.err = norm(simu.getsol() - simu.getsolwithnoise())
-            ax.set_xlim(-1, 1)
-            ax.set_ylim(-1, 1)
-            ax.set_zlim(-1, 1)
+            ax.set_xlim(self.coordx[1, 1], self.coordx[self.nx-1, self.ny-1])
+            ax.set_ylim(self.coordy[1, 1], self.coordy[self.nx-1, self.ny-1])
+            ax.set_zlim(0, 1)
             ax.set_title('It = ' + str(i) + ',\n err = ' + str(simu.err))
             return surf,
 
         fig = plt.figure()
         ax = fig.gca(projection='3d')
-        ax.set_xlim(-1, 1)
-        ax.set_ylim(-1, 1)
-        ax.set_zlim(-1, 1)
+        ax.set_xlim(self.coordx[1, 1], self.coordx[self.nx-1, self.ny-1])
+        ax.set_ylim(self.coordy[1, 1], self.coordy[self.nx-1, self.ny-1])
+        ax.set_zlim(0, 1)
 
         _ = animation.FuncAnimation(fig, plot_update, compute(simu), blit=False, interval=10,
                                     repeat=False)
@@ -239,7 +239,7 @@ class Grid_DF2(Grid):
         :return: matrix M such that M*field = dy field
         """
         mini_mat = np.zeros([3, 3])
-        start = max([0, i - 1])
+        start = max([0, j - 1])
         end = min([start + 3, self.ny])
         start = end - 3
         for k in range(start, end):

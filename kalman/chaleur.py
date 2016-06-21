@@ -18,6 +18,8 @@ import numpy as np
 from kalman.kalman import KalmanFilter
 from kalman.skeleton import *
 from kalman.grid import Grid_DF2
+import math
+import sys
 
 
 class Reality(SkelReality):
@@ -31,6 +33,27 @@ class Reality(SkelReality):
         self.grid = _grid
         SkelReality.__init__(self, _noiselevel, _dt, _grid.shape)
         self.power = _power
+        c1 = 16 * _power/(math.pi ** 2)
+        c2 = math.pi / self.grid.Lx
+        c3 = 0.5 * math.pi / self.grid.Ly
+        c4 = math.pi * math.pi / (4. * self.grid.Ly ** 2)
+        c5 = math.pi * math.pi / (self.grid.Lx ** 2)
+        add = np.zeros([self.grid.nx, self.grid.ny])
+        self.nmode = 1
+        self.mmode = 1
+        self.initfield = np.zeros([self.grid.nx, self.grid.ny])
+        for m in range(1, self.nmode+1):
+            for n in range(1, self.mmode+1):
+                c10 = c1 / ((2. * n - 1.)*(2. * m - 1.))
+                c20 = c2 * (2. * n - 1.)
+                c30 = c3 * (2. * m - 1.)
+                for i in range(self.grid.nx):
+                    for j in range(self.grid.ny):
+                        x = self.grid.coordx[i][j]
+                        y = self.grid.coordy[i][j]
+                        add[i][j] = c10 * math.sin(c20 * x) \
+                                        * math.sin(c30 * y)
+                self.initfield += add
 
     def step(self):
         """
@@ -39,10 +62,22 @@ class Reality(SkelReality):
         self.field = np.zeros([self.grid.nx, self.grid.ny])
         self.It += 1
         time = self.It * self.dt
-        for i in range(self.grid.nx):
-            for j in range(self.grid.ny):
-                self.field[i][j] = 1. - self.power * (
-                    (self.grid.coordx[i][j]) ** 2 + (self.grid.coordy[i][j]) ** 2) / 4.
+        c4 = math.pi * math.pi / (4. * self.grid.Ly ** 2)
+        c5 = math.pi * math.pi / (self.grid.Lx ** 2)
+        add = np.zeros([self.grid.nx, self.grid.ny])
+        for m in range(1, self.nmode+1):
+            for n in range(1, self.mmode+1):
+                c40 = c4 * (2. * n - 1.) ** 2
+                c50 = c5 * (2. * m - 1.) ** 2
+                for i in range(self.grid.nx):
+                    for j in range(self.grid.ny):
+                        add[i][j] = self.initfield[i][j] * math.exp(-(c40 + c50) * time)
+                self.field += add
+                # print(m, n, self.grid.norm_h1(add))
+                # if self.grid.norm_h1(add) < 0.001:
+                #     break
+
+                # self.field[i][j] = 1.
 
 
 class Simulation(SkelSimulation):
@@ -59,11 +94,24 @@ class Simulation(SkelSimulation):
 
         SkelSimulation.__init__(self, _noiselevel, self.dt, self.grid.shape)
         self.power = _power
-        nx = _grid.nx
-        ny = _grid.ny
 
-        indx = self.grid.indx
         # compute matrix
+        self.calcmat()
+
+        # rhs and boundary conditions
+        self.calcmatbc()
+
+        self.field = np.zeros([self.size])
+        self.calcbc()
+
+    def calcmat(self):
+        """
+            compute the matrix for diffusion equation
+        :return:
+        """
+        indx = self.grid.indx
+        nx = self.grid.nx
+        ny = self.grid.ny
         # time
         self.Mat = np.eye(self.size, self.size)
         # Laplacien
@@ -74,23 +122,87 @@ class Simulation(SkelSimulation):
                 self.Mat[indx(i, j)] += np.reshape(self.grid.dderx(self.field), [self.size])
                 self.Mat[indx(i, j)] += np.reshape(self.grid.ddery(self.field), [self.size])
         self.Mat = self.Mat.transpose()
-        # rhs and boundary conditions
-        self.rhs = np.zeros([self.size]) + self.power * self.dt
-        for j in range(ny):
-            self.Mat[indx(0, j)] = np.zeros([self.size])
-            self.Mat[indx(nx - 1, j)] = np.zeros([self.size])
-            self.Mat[indx(0, j)][indx(0, j)] = 1.
-            self.Mat[indx(nx - 1, j)][indx(nx - 1, j)] = 1.
-            self.rhs[indx(0, j)] = 0.
-            self.rhs[indx(nx - 1, j)] = 0.
+
+    def calcmatbc(self):
+        """
+            Insert boundary condition inside the matrix of the diffusion problem
+        :return:
+        """
+        indx = self.grid.indx
+        nx = self.grid.nx
+        ny = self.grid.ny
+
+        def zeroing(_i, _j):
+            """
+                Set the line corresponding to the point i,j to 0 except on the diagonal
+            :param _i:
+            :param _j:
+            :return:
+            """
+            self.Mat[indx(_i, _j)] = np.zeros([self.size])
+            self.Mat[indx(_i, _j)][indx(_i, _j)] = 1.
+
         for i in range(nx):
-            self.Mat[indx(i, 0)] = np.zeros([self.size])
-            self.Mat[indx(i, ny - 1)] = np.zeros([self.size])
-            self.Mat[indx(i, 0)][indx(i, 0)] = 1.
-            self.Mat[indx(i, ny - 1)][indx(i, ny - 1)] = 1.
-            self.rhs[indx(i, 0)] = 0.
-            self.rhs[indx(i, ny - 1)] = 0.
-        self.field = np.zeros([self.size])
+            zeroing(i, 0)
+            zeroing(i, ny - 1)
+        for j in range(ny):
+            zeroing(0, j)
+            zeroing(nx - 1, j)
+
+    def calcbc(self):
+        """
+            Impose boundary condition on the field
+        :return:
+        """
+        indx = self.grid.indx
+        nx = self.grid.nx
+        ny = self.grid.ny
+
+        def dirichlet(_i, _j, val):
+            """
+                Impose a Dirichlet boundary condition
+            :param _i:
+            :param _j:
+            :param val:
+            :return:
+            """
+            self.field[indx(_i, _j)] = val
+
+        def neumann(_i, _j, val, _dir):
+            """
+                Impose a neumann boundary condition
+            :param _i:
+            :param _j:
+            :param val:
+            :param _dir:
+            :return:
+            """
+            if _dir[0] != 0:
+                der = self.grid.derx
+            else:
+                der = self.grid.dery
+
+            self.field[indx(_i, _j)] = - val
+            newval = 0.
+            c = 0.
+            for k in range(2, -1, -1):
+                dir1 = np.array([_i, _j]) + k * _dir
+                tmp = np.zeros([nx, ny])
+                tmp[dir1[0], dir1[1]] = 1.
+                tmp = der(tmp)
+                c = tmp[_i, _j]
+                newval -= c * self.field[indx(dir1[0], dir1[1])]
+
+            self.field[indx(_i, _j)] = newval / c
+
+        for i in range(nx):
+            dirichlet(i, 0, 0.)
+            # dirichlet(i, ny - 1, 1.)
+            neumann(i, ny - 1, 0., np.array([0, -1]))
+        for j in range(ny):
+            dirichlet(0, j, 0.)
+            dirichlet(nx - 1, j, 0.)
+            # neumann(nx - 1, j, 1., 0)
 
     def getsol(self):
         """
@@ -110,16 +222,10 @@ class Simulation(SkelSimulation):
         """
             Increment through the next time step of the simulation.
         """
-        indx = self.grid.indx
         power = np.random.normal(self.power, self.noiselevel, self.rhs.shape)
         self.rhs = np.zeros([self.size]) + power * self.dt
-        for j in range(self.grid.ny):
-            self.rhs[indx(0, j)] = 0.
-            self.rhs[indx(self.grid.nx - 1, j)] = 0.
-        for i in range(self.grid.nx):
-            self.rhs[indx(i, 0)] = 0.
-            self.rhs[indx(i, self.grid.ny - 1)] = 0.
         SkelSimulation.step(self)
+        self.calcbc()
 
 
 class KalmanWrapper(SkelKalmanWrapper):
@@ -135,16 +241,16 @@ class KalmanWrapper(SkelKalmanWrapper):
         self.kalman.R = np.eye(self.kalman.size_o) * self.reality.noiselevel ** 2   # Estimated error in measurements.
 
         indx = self.kalsim.grid.indx
-        # G = np.zeros([self.kalman.size_s, 1])
-        # for i in range(self.kalsim.grid.nx):
-        #     for j in range(self.kalsim.grid.ny):
-        #         # G[indx(i, j)] = self.kalsim.grid.dx ** 4 / 24. \
-        #         #               + self.kalsim.grid.dy ** 4 / 24. \
-        #         #               + self.kalsim.dt ** 2 / 2.
-        #         G[indx(i, j)] = self.kalsim.dt
-        #
-        # self.kalman.Q = G.dot(np.transpose(G)) * self.kalsim.noiselevel ** 2  # Estimated error in process.
-        self.kalman.Q = np.eye(self.kalman.size_s) * self.kalsim.noiselevel ** 2  # Estimated error in process.
+        G = np.zeros([self.kalman.size_s, 1])
+        for i in range(self.kalsim.grid.nx):
+            for j in range(self.kalsim.grid.ny):
+                G[indx(i, j)] = self.kalsim.grid.dx ** 4 / 24. \
+                              + self.kalsim.grid.dy ** 4 / 24. \
+                              + self.kalsim.dt ** 2 / 2.
+                # G[indx(i, j)] = self.kalsim.dt
+
+        self.kalman.Q = G.dot(np.transpose(G)) * self.kalsim.noiselevel ** 2  # Estimated error in process.
+        # self.kalman.Q = np.eye(self.kalman.size_s) * self.kalsim.noiselevel ** 2  # Estimated error in process.
 
     def getwindow(self):
         """
@@ -201,9 +307,9 @@ class Chaleur(EDP):
     Ly = 3.
     nx = 20
     ny = 20
-    power = 2.
-    noise_real = .3
-    noise_sim = .5
+    power = 1.
+    noise_real = 0.1
+    noise_sim = 0.1
     dt = 0.
     nIt = 150
     name = "Chaleur"
@@ -211,6 +317,8 @@ class Chaleur(EDP):
     def __init__(self):
         EDP.__init__(self)
         self.grid = Grid_DF2(self.nx, self.ny, self.Lx, self.Ly)
+        self.grid.coordx += self.grid.Lx / 2.
+        self.grid.coordy += self.grid.Ly / 2.
         self.reinit()
         print("cfl = ", max([self.dt / (self.grid.dx ** 2), self.dt / (self.grid.dy ** 2)]))
         print("dt = ", self.dt)
@@ -221,8 +329,8 @@ class Chaleur(EDP):
             Reinit everything
         :return:
         """
-        self.simulation = Simulation(self.grid, self.power, self.noise_sim)
-        self.kalsim = Simulation(self.grid, self.power, self.noise_sim)
+        self.simulation = Simulation(self.grid, 0., self.noise_sim)
+        self.kalsim = Simulation(self.grid, 0., self.noise_sim)
 
         self.dt = self.simulation.dt
         self.reality = Reality(self.grid, self.power, self.noise_real, self.dt)
@@ -320,5 +428,10 @@ class Chaleur(EDP):
 
         # ------------------------ Final output ----------------------------
 
+        print("%8.2e | %8.2e | %8.2e | %8.2e" % (Norm_ref, Err_mes, Err_sim, Err_kal))
+        Norm_ref = self.grid.norm_inf(Sol_ref)
+        Err_mes = self.grid.norm_inf(Sol_ref - Sol_mes)
+        Err_sim = self.grid.norm_inf(Sol_ref - Sol_sim)
+        Err_kal = self.grid.norm_inf(Sol_ref - Sol_kal)
         print("%8.2e | %8.2e | %8.2e | %8.2e" % (Norm_ref, Err_mes, Err_sim, Err_kal))
 
