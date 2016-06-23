@@ -13,9 +13,24 @@ from __future__ import print_function, absolute_import
 import math
 import numpy as np
 import matplotlib.pyplot as plt
-from kalman.kalman import KalmanFilter
-from kalman.skeleton import *
+try:
+    from kalman.kalman import KalmanFilter
+    from kalman.skeleton import *
+    if sys.version_info < (3,):
+        from kalman.libs.fortran_libs_py2 import gauss_f
+    else:
+        from kalman.libs.fortran_libs_py3 import gauss_f
+except:
+    from kalman import KalmanFilter
+    from skeleton import *
+    if sys.version_info < (3,):
+        from libs.fortran_libs_py2 import gauss_f
+    else:
+        from libs.fortran_libs_py3 import gauss_f
 import random
+
+use_fortran = True
+
 
 if sys.version_info < (3,):
     range = xrange
@@ -43,7 +58,7 @@ class Reality(SkelReality):
         """
             Compute the analytical solution
         """
-        self.field = np.zeros([self.size])
+        # self.field = np.zeros([self.size])
         self.It += 1
         time = self.It * self.dt
         # avec frottement
@@ -90,7 +105,7 @@ class Simulation(SkelSimulation):
         # v_n+1 = (1 - h*dt) v_n - dt*g + O(dt^2)
         c1 = 1.
         c2 = self.dt
-        c3 = 0.
+        c3 = 0.5 * self.dt * self.dt
         c5 = 1. - self.frot * self.dt
         c6 = self.dt
 
@@ -107,10 +122,14 @@ class Simulation(SkelSimulation):
         """
             Increment through the next time step of the simulation.
         """
-        c3 = 0.
+        c3 = 0.5 * self.dt * self.dt
         c6 = self.dt
-        g1 = random.gauss(0, self.noiselevel)
-        g2 = random.gauss(self.g, self.noiselevel)
+        if use_fortran:
+            g1 = gauss_f([0.], self.noiselevel)[0]
+            g2 = gauss_f([self.g], self.noiselevel)[0]
+        else:
+            g1 = random.gauss(0, self.noiselevel)
+            g2 = random.gauss(self.g, self.noiselevel)
         self.rhs = np.array([+c3 * g1,
                              +c6 * g1,
                              +c3 * g2,
@@ -127,12 +146,16 @@ class KalmanWrapper(SkelKalmanWrapper):
         self.kalman.S = np.eye(self.kalman.size_s) * 0.  # Initial covariance estimate.
         self.kalman.R = np.eye(self.kalman.size_o) * self.reality.noiselevel ** 2  # Estimated error in measurements.
 
-        G = np.array([[_sim.dt],
-                      [_sim.dt ** 2 * 0.5],
-                      [_sim.dt],
-                      [_sim.dt**2 * 0.5]])
-        self.kalman.Q = G.dot(np.transpose(G)) * self.kalsim.noiselevel ** 2   # Estimated error in process.
-        # self.kalman.Q = np.eye(self.kalman.size_s) * self.kalsim.noiselevel ** 2  # Estimated error in process.
+        # G = np.array([[_sim.dt],
+        #               [_sim.dt ** 2 * 0.5],
+        #               [_sim.dt],
+        #               [_sim.dt**2 * 0.5]])
+        # self.kalman.Q = G.dot(np.transpose(G)) * self.kalnoise ** 2   # Estimated error in process.
+        # self.kalman.Q = np.eye(self.kalman.size_s) * self.kalnoise ** 2  # Estimated error in process.
+        self.kalman.Q = np.array([[0., 0., 0., 0.],
+                                  [0., 0., 0., 0.],
+                                  [0., 0., _sim.dt ** 2, 0.],
+                                  [0., 0., 0., _sim.dt ** 2]]) * self.kalnoise ** 2
 
     def getwindow(self):
         """
