@@ -39,6 +39,8 @@ if sys.version_info < (3, ):
     range = xrange
 
 
+
+
 class Reality(SkelReality):
     """
     This class contains the analytical solution of our problem.
@@ -143,8 +145,9 @@ class Simulation(SkelSimulation):
 class KalmanWrapper(SkelKalmanWrapper):
     """This class is use around the simulation to apply the kalman filter."""
 
-    def __init__(self, _reality, _sim):
+    def __init__(self, _reality, _sim, _kalnoise):
         """Initilisation."""
+        self.kalnoise = _kalnoise
         SkelKalmanWrapper.__init__(self, _reality, _sim)
 
         # Initial covariance estimate.
@@ -164,7 +167,7 @@ class KalmanWrapper(SkelKalmanWrapper):
         self.kalman.Q = np.array([[_sim.dt ** 2, 0., 0., 0.],
                                   [0., _sim.dt ** 2, 0., 0.],
                                   [0., 0., _sim.dt ** 2, 0.],
-                                  [0., 0., 0., _sim.dt ** 2]]) * _sim.noiselevel ** 2
+                                  [0., 0., 0., _sim.dt ** 2]]) * self.kalnoise ** 2
 
     def getwindow(self):
         """
@@ -214,22 +217,21 @@ class Drop(EDP):
     * A filtered simulation
     * how to plot the results
     """
-
-    Tfin = 15.
+    # Tfin = 15.
     nIt = 300
     noise_real = 20
     noise_sim = 10
-    dt = Tfin / nIt
+    dt = 0.5
     name = "Drop"
 
     def __init__(self):
         """Initilisation."""
         EDP.__init__(self)
-        print("Norme L2 |  mesure  |   simu   |  kalman")
+        # print("Norme L2 |  mesure  |   simu   |  kalman")
 
-        self.reinit()
+        self.reinit(self.noise_sim)
 
-    def reinit(self):
+    def reinit(self, _kalnoise):
         """Reinit everything."""
         self.simulation = Simulation(self.dt, self.noise_sim)
         self.kalsim = Simulation(self.dt, self.noise_sim)
@@ -241,7 +243,7 @@ class Drop(EDP):
         self.kalsim.nIt = self.nIt
         self.reality.nIt = self.nIt
 
-        self.kalman = KalmanWrapper(self.reality, self.kalsim)
+        self.kalman = KalmanWrapper(self.reality, self.kalsim, _kalnoise)
 
     @staticmethod
     def plot(field):
@@ -284,32 +286,32 @@ class Drop(EDP):
         plt.legend(('reality', 'measured', 'simulated', 'kalman'))
         plt.show()
 
-    def run_test_case(self, graphs):
+    def run_test_case(self, graphs, _kalnoise):
         """Run the test case."""
-        self.reinit()
+        self.reinit(_kalnoise)
 
         Sol_ref = np.zeros([self.nIt, 4])
-        Sol_mes = np.zeros([self.nIt, 4])
-        Sol_sim = np.zeros([self.nIt, 4])
+        # Sol_mes = np.zeros([self.nIt, 4])
+        # Sol_sim = np.zeros([self.nIt, 4])
         Sol_kal = np.zeros([self.nIt, 4])
 
         # ----------------- Compute reality and measurement -------------------
         for it in self.compute(self.reality):
             Sol_ref[it, :] = self.reality.getsol()
-            Sol_mes[it, :] = self.reality.getsolwithnoise()
+            # Sol_mes[it, :] = self.reality.getsolwithnoise()
 
         Norm_ref = self.norm(Sol_ref)
-        Err_mes = self.norm(Sol_ref - Sol_mes) / Norm_ref
+        # Err_mes = self.norm(Sol_ref - Sol_mes) / Norm_ref
 
         # ------------------------ Compute simulation without Kalman ----------
-        self.reality.reinit()
-        # Initial solution
-        self.simulation.setsol(self.reality.getsol())
-
-        for it in self.compute(self.simulation):
-            Sol_sim[it, :] = self.simulation.getsol()
-
-        Err_sim = self.norm(Sol_ref - Sol_sim) / Norm_ref
+        # self.reality.reinit()
+        # # Initial solution
+        # self.simulation.setsol(self.reality.getsol())
+        # 
+        # for it in self.compute(self.simulation):
+        #     Sol_sim[it, :] = self.simulation.getsol()
+        # 
+        # Err_sim = self.norm(Sol_ref - Sol_sim) / Norm_ref
 
         # ------------------------ Compute simulation with Kalman -------------
 
@@ -321,14 +323,70 @@ class Drop(EDP):
             Sol_kal[it, :] = self.kalman.getsol()
 
         Err_kal = self.norm(Sol_ref - Sol_kal) / Norm_ref
+        Err_kal = np.sqrt(np.sum(np.square(Sol_ref[-1, :] - Sol_kal[-1, :])))
 
         # ------------------------ Final output ----------------------------
 
-        print("%8.2e | %8.2e | %8.2e | %8.2e" %
-              (Norm_ref, Err_mes, Err_sim, Err_kal))
+        # print("%8.2e | %8.2e | %8.2e | %8.2e" %
+        #       (Norm_ref, Err_mes, Err_sim, Err_kal))
         if graphs:
             self.plotall(Sol_ref, Sol_mes, Sol_sim, Sol_kal)
+        return Err_kal
+
+
+def find_min():
+    def fx():
+        return Drop().run_test_case(False, kalnoise)
+        # return ((kalnoise-2.1) **2 + 1. )
+
+    kalnoise = 8
+    err = 0.
+    it = 0
+    print("start        -1 %9.2e " % (kalnoise), end=" ")
+    for it in range(1, 100):
+        err1 = fx()
+        err += err1
+        if err1 / err < 1e-3:
+            break
+    err = err / it
+    print(" %9.2e " % (err),it)
+    alpha = 1
+    old_dir = 1
+
+    old_kalnoise = kalnoise
+    old_err = err
+    for opt in range(100):
+        kalnoise += alpha
+        print("continuing  %3i %9.2e " % (opt, kalnoise), end=" ")
+        err = 0.
+        for it in range(1, 100):
+            err1 = fx()
+            err += err1
+            if err1 / err < 1e-3:
+                break
+        err = err / it
+        print(" %9.2e " % (err), end=" ")
+        der = (err - old_err) / (kalnoise - old_kalnoise)
+        print(" %9.2e " % (der), end=" ")
+        if abs(der) < 1e-10:
+            print("Fin")
+            break
+        dir = -der / abs(der)
+        if dir != old_dir:
+            # print("gone too far",kalnoise,old_kalnoise, alpha)
+            # print("gone too far", kalnoise, err, old_kalnoise,old_err)
+            print("gone too far")
+            # kalnoise = old_kalnoise - alpha
+            alpha *= - 0.5
+        else:
+            print("")
+        # print("")
+        old_kalnoise = kalnoise
+        old_err = err
+        old_dir = dir
+
 
 
 if __name__ == "__main__":
-    Drop().run_test_case(False)
+    find_min()
+

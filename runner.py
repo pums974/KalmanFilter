@@ -30,14 +30,14 @@ import sys
 import time
 
 Drop = True
-Chaleur = True
-Convection = True
-graphs = True
-profiling = False
+Chaleur = False
+Convection = False
+graphs = False
+profiling = True
 if profiling:
     import pprofile
 if Drop:
-    from kalman.drop import Drop
+    from kalman.drop import Drop, find_min
 if Chaleur:
     from kalman.chaleur import Chaleur
 if Convection:
@@ -66,8 +66,9 @@ def run_a_test_case(edp):
     :return:
     """
     t1 = time.clock()
-    for i in range(1):
-        edp.run_test_case(graphs)
+    # for i in range(1):
+    #     edp.run_test_case(graphs)
+    find_min()
     t2 = time.clock()
     print("Elapsed " + str(t2 - t1) + "s")
 
