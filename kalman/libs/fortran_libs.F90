@@ -47,21 +47,81 @@ subroutine derx_upwind_f(field, derx, velofield,dx, n, m)
   double precision,intent(in) :: field(n,m),dx
   double precision,intent(in) :: velofield(n,m,2)
   double precision,intent(out) :: derx(n,m)
-  integer :: i,j
+  integer :: i,j,k
   double precision :: ap,am,rdx
+  integer,parameter :: order=2
 
-  rdx = 1./dx
+!  rdx = 1./dx
+!  derx = 0.
+!  do j = 1,m
+!    do i = 1,n
+!        k=0
+!        if (i > 1) then
+!            ap = max(velofield(i,j,1) + velofield(i - 1,j,1), 0.d0)*0.5d0
+!            derx(i,j) = derx(i,j) + ap * (field(i,j) - field(i-1,j)) * rdx
+!            k=k+1
+!        endif
+!        if (i < n) then
+!            am = min(velofield(i,j,1) + velofield(i + 1,j,1), 0.d0)*0.5d0
+!            derx(i,j) = derx(i,j) + am * (field(i+1,j) - field(i,j)) * rdx
+!            k=k+1
+!        endif
+!!        if (k==2) then
+!!          if (ap - am < 1e-1) then
+!!            derx(i,j) = velofield(i,j,1) * (field(i+1,j) - field(i-1,j)) * rdx * 0.5
+!!            print*,"coucou",ap - am
+!!            k=1
+!!          endif
+!!        endif
+!        derx(i,j)=derx(i,j)/k
+!     enddo
+!   enddo
   derx = 0.
+if (order==2) then
+  rdx = 0.5/dx
   do j = 1,m
-    do i = 1,n
-        ap = max(velofield(i,j,1), 0.d0)*0.5d0
-        am = min(velofield(i,j,1), 0.d0)*0.5d0
-        if (i > 1) &
-            derx(i,j) = derx(i,j) + ap * (field(i,j) - field(i-1,j)) * rdx
-        if (i < n) &
-            derx(i,j) = derx(i,j) + am * (field(i+1,j) - field(i,j)) * rdx
-     enddo
-   enddo
+    do i = 3,n-2
+        ap = max(velofield(i,j,1) + velofield(i - 1,j,1), 0.d0)*0.25d0
+        am = min(velofield(i,j,1) + velofield(i + 1,j,1), 0.d0)*0.25d0
+        derx(i,j) = derx(i,j) + ap * (3.*field(i,j) - 4.*field(i-1,j)+field(i-2,j)) * rdx
+        derx(i,j) = derx(i,j) + am * (-field(i+2,j) + 4.*field(i+1,j) - 3.*field(i,j)) * rdx
+    enddo
+  enddo
+  rdx = 1./dx
+  do j = 1,m
+     i = 2
+        ap = max(velofield(i,j,1) + velofield(i - 1,j,1), 0.d0)*0.25d0
+        am = min(velofield(i,j,1) + velofield(i + 1,j,1), 0.d0)*0.25d0
+        derx(i,j) = derx(i,j) + ap * (field(i,j) - field(i-1,j)) * rdx
+        derx(i,j) = derx(i,j) + am * (field(i+1,j) - field(i,j)) * rdx
+     i = n-1
+        ap = max(velofield(i,j,1) + velofield(i - 1,j,1), 0.d0)*0.25d0
+        am = min(velofield(i,j,1) + velofield(i + 1,j,1), 0.d0)*0.25d0
+        derx(i,j) = derx(i,j) + ap * (field(i,j) - field(i-1,j)) * rdx
+        derx(i,j) = derx(i,j) + am * (field(i+1,j) - field(i,j)) * rdx
+  enddo
+else
+  rdx = 1./dx
+  do j = 1,m
+    do i = 2,n-1
+        ap = max(velofield(i,j,1) + velofield(i - 1,j,1), 0.d0)*0.25d0
+        am = min(velofield(i,j,1) + velofield(i + 1,j,1), 0.d0)*0.25d0
+        derx(i,j) = derx(i,j) + ap * (field(i,j) - field(i-1,j)) * rdx
+        derx(i,j) = derx(i,j) + am * (field(i+1,j) - field(i,j)) * rdx
+    enddo
+  enddo
+endif
+  do j = 1,m
+     i = 1
+     am = min(velofield(i,j,1) + velofield(i + 1,j,1), 0.d0)*0.5d0
+     derx(i,j) = am * (field(i+1,j) - field(i,j)) * rdx
+  enddo
+  do j = 1,m
+     i = n
+     ap = max(velofield(i,j,1) + velofield(i - 1,j,1), 0.d0)*0.5d0
+     derx(i,j) = ap * (field(i,j) - field(i-1,j)) * rdx
+  enddo
+
 end subroutine derx_upwind_f
 
 subroutine dery_upwind_f(field, dery, velofield,dy, n, m)
@@ -72,19 +132,75 @@ subroutine dery_upwind_f(field, dery, velofield,dy, n, m)
   double precision,intent(out) :: dery(n,m)
   integer :: i,j
   double precision :: ap,am,rdy
-
-  rdy = 1./dy
+  integer,parameter :: order = 2
+!  rdy = 1./dy
+!  dery = 0.
+!  do j = 1,m
+!    do i = 1,n
+!        ap = max(velofield(i,j,2), 0.d0)*0.5
+!        am = min(velofield(i,j,2), 0.d0)*0.5
+!        if (j > 1) &
+!            dery(i,j) = dery(i,j) + ap * (field(i,j) - field(i,j-1)) * rdy
+!        if (j < n) &
+!            dery(i,j) = dery(i,j) + am * (field(i,j+1) - field(i,j)) * rdy
+!     enddo
+!   enddo
+   
+   
   dery = 0.
-  do j = 1,m
+if (order==2) then
+  rdy = 0.5/dy
+  do j = 3,m-2
     do i = 1,n
-        ap = max(velofield(i,j,2), 0.d0)*0.5
-        am = min(velofield(i,j,2), 0.d0)*0.5
-        if (j > 1) &
-            dery(i,j) = dery(i,j) + ap * (field(i,j) - field(i,j-1)) * rdy
-        if (j < n) &
-            dery(i,j) = dery(i,j) + am * (field(i,j+1) - field(i,j)) * rdy
+        ap = max(velofield(i,j,2) + velofield(i,j - 1,2), 0.d0)*0.25d0
+        am = min(velofield(i,j,2) + velofield(i,j + 1,2), 0.d0)*0.25d0
+        dery(i,j) = dery(i,j) + ap * (3.*field(i,j) - 4.*field(i,j-1)+field(i,j-2)) * rdy
+        dery(i,j) = dery(i,j) + am * (-field(i,j+2) + 4.*field(i,j+1) - 3.*field(i,j)) * rdy
+    enddo
+  enddo
+  rdy = 1./dy
+  j = 2
+  do i = 1,n
+        ap = max(velofield(i,j,2) + velofield(i,j - 1,2), 0.d0)*0.25d0
+        am = min(velofield(i,j,2) + velofield(i,j + 1,2), 0.d0)*0.25d0
+        dery(i,j) = dery(i,j) + ap * (field(i,j) - field(i,j-1)) * rdy
+        dery(i,j) = dery(i,j) + am * (field(i,j+1) - field(i,j)) * rdy
+  enddo
+  j = m-1
+  do i = 1,n
+        ap = max(velofield(i,j,2) + velofield(i,j - 1,2), 0.d0)*0.25d0
+        am = min(velofield(i,j,2) + velofield(i,j + 1,2), 0.d0)*0.25d0
+        dery(i,j) = dery(i,j) + ap * (field(i,j) - field(i,j-1)) * rdy
+        dery(i,j) = dery(i,j) + am * (field(i,j+1) - field(i,j)) * rdy
+  enddo
+else
+  rdy = 1./dy
+  do j = 2,m-1
+    do i = 1,n
+        ap = max(velofield(i,j,2) + velofield(i,j - 1,2), 0.d0)*0.25d0
+        am = min(velofield(i,j,2) + velofield(i,j + 1,2), 0.d0)*0.25d0
+        dery(i,j) = dery(i,j) + ap * (field(i,j) - field(i,j-1)) * rdy
+        dery(i,j) = dery(i,j) + am * (field(i,j+1) - field(i,j)) * rdy
      enddo
    enddo
+endif
+   j=1
+   do i = 1,n
+      am = min(velofield(i,j,2) + velofield(i,j + 1,2), 0.d0)*0.5d0
+      dery(i,j) = am * (field(i,j+1) - field(i,j)) * rdy
+   enddo
+   j = m
+   do i = 1,n
+      ap = max(velofield(i,j,2) + velofield(i,j - 1,2), 0.d0)*0.5d0
+      dery(i,j) = ap * (field(i,j) - field(i,j-1)) * rdy
+   enddo
+   
+   
+
+
+
+
+   
 end subroutine dery_upwind_f
 
 subroutine kalman_apply_f(Phi, S1, Q, M, R, Y, X1,s,x,n1,n2)

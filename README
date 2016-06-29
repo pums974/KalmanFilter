@@ -5,8 +5,8 @@ export DBG="-O0 -g -traceback -C -debug all -fpe0 -ftrapuv -init=snan"
 export COMP="intelem"
 
 #gfortran + lapack
-#export LIBS="-L/usr/lib/lapack -llapack"
-#export OPTS="-Ofast -march=native -static -fdefault-real-8 -fdefault-double-8 -flto"
+#export LIBS="-L/usr/lib/lapack -llapack -lblas"
+#export OPTS="-Ofast -march=native -fdefault-real-8 -fdefault-double-8 -flto"
 #export DBG="-O0 -g3 -fbacktrace -fcheck=all -pedantic -ffpe-trap=zero,overflow,invalid -finit-real=snan"
 #export COMP="gnu95"
 

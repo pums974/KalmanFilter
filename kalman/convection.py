@@ -15,10 +15,15 @@
 from __future__ import print_function, absolute_import
 
 import numpy as np
-
-from kalman.kalman import KalmanFilter
-from kalman.skeleton import *
-from kalman.grid import Grid_Upwind
+import matplotlib.pyplot as plt
+try:
+    from kalman.kalman import KalmanFilter
+    from kalman.skeleton import *
+    from kalman.grid import Grid_Upwind
+except:
+    from kalman import KalmanFilter
+    from skeleton import *
+    from grid import Grid_Upwind
 import math
 
 if sys.version_info < (3,):
@@ -43,7 +48,7 @@ class Reality(SkelReality):
         self.field = np.zeros([self.grid.nx, self.grid.ny])
         self.It += 1
         time = self.It * self.dt
-        width = 2.
+        width = 4.
         x0 = self.grid.Lx * math.cos(time * self.dtheta * 0.5) * 0.25
         y0 = self.grid.Lx * math.sin(time * self.dtheta * 0.5) * 0.25
         tmp1 = np.square(self.grid.coordx - x0)
@@ -56,7 +61,7 @@ class Simulation(SkelSimulation):
     This class contains everything for the simulation
     """
     # --------------------------------PARAMETERS--------------------------------
-    cfl = 1. / 2.
+    cfl = 1.
 
     # ---------------------------------METHODS-----------------------------------
     def __init__(self, _grid, _noiselevel):
@@ -84,15 +89,15 @@ class Simulation(SkelSimulation):
         for j in range(ny):
             self.Mat[indx(0, j)] = np.zeros([self.size])
             self.Mat[indx(nx - 1, j)] = np.zeros([self.size])
-            self.Mat[indx(0, j)][indx(0, j)] = 1.
-            self.Mat[indx(nx - 1, j)][indx(nx - 1, j)] = 1.
+            # self.Mat[indx(0, j)][indx(0, j)] = 1.
+            # self.Mat[indx(nx - 1, j)][indx(nx - 1, j)] = 1.
             self.rhs[indx(0, j)] = 0.
             self.rhs[indx(nx - 1, j)] = 0.
         for i in range(nx):
             self.Mat[indx(i, 0)] = np.zeros([self.size])
             self.Mat[indx(i, ny - 1)] = np.zeros([self.size])
-            self.Mat[indx(i, 0)][indx(i, 0)] = 1.
-            self.Mat[indx(i, ny - 1)][indx(i, ny - 1)] = 1.
+            # self.Mat[indx(i, 0)][indx(i, 0)] = 1.
+            # self.Mat[indx(i, ny - 1)][indx(i, ny - 1)] = 1.
             self.rhs[indx(i, 0)] = 0.
             self.rhs[indx(i, ny - 1)] = 0.
         self.field = np.zeros([self.size])
@@ -165,15 +170,15 @@ class Convection(EDP):
         * A filtered simulation
         * how to plot the results
     """
-    T_fin = 20.
+    T_fin = 5.
     nIt = 0
     noise_real = 0.065
     noise_sim = 0.007
     # noise_sim = 0.005
-    Lx = 4.
-    Ly = 4.
-    nx = 17
-    ny = 17
+    Lx = 6.
+    Ly = 6.
+    nx = 51
+    ny = 51
     dtheta = 2. * math.pi / 10.
     dt = 0.
     name = "Convection"
@@ -300,6 +305,29 @@ class Convection(EDP):
 
         print("%8.2e   | %8.2e | %8.2e" % (np.max(Sol_ref), np.max(Sol_sim), np.max(Sol_kal)))
         print("%8.2e | %8.2e | %8.2e | %8.2e" % (Norm_ref, Err_mes, Err_sim, Err_kal))
+
+        if graphs:
+            """
+                Plot all the trajectory on the same graph
+            :param field_ref: the analytical solution
+            :param field_mes: a noisy trajectory around the analytical solution
+            :param field_sim: a simulated trajectory
+            :param field_kal: a filtered trajectory
+            """
+            fig = plt.figure()
+            ax = fig.gca()
+            plt.xlabel('Position')
+            plt.ylabel('Field Value')
+            # ax.set_xlim(self.grid.coordx[0, 0], self.grid.coordx[self.nx - 1, self.ny - 1])
+            ax.set_xlim(self.grid.coordy[int(self.nx / 2), int(self.ny / 2)],
+                        self.grid.coordy[self.nx - 1, self.ny - 1])
+            ax.set_ylim(-0.1, 1.1)
+            plt.plot(self.grid.coordy[int(self.nx / 2), :], Sol_ref[int(self.nx / 2), :], 'k--',
+                     self.grid.coordy[int(self.nx / 2), :], Sol_mes[int(self.nx / 2), :], 'o',
+                     self.grid.coordy[int(self.nx / 2), :], Sol_sim[int(self.nx / 2), :], 'b-',
+                     self.grid.coordy[int(self.nx / 2), :], Sol_kal[int(self.nx / 2), :], 'r-')
+            plt.legend(('Analytic', 'Disturbed', 'Simulated', 'Filtered'), loc=2)
+            plt.show()
 
 if __name__ == "__main__":
     Convection().run_test_case(False)

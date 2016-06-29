@@ -152,10 +152,10 @@ class KalmanWrapper(SkelKalmanWrapper):
         #               [_sim.dt**2 * 0.5]])
         # self.kalman.Q = G.dot(np.transpose(G)) * self.kalnoise ** 2   # Estimated error in process.
         # self.kalman.Q = np.eye(self.kalman.size_s) * self.kalnoise ** 2  # Estimated error in process.
-        self.kalman.Q = np.array([[0., 0., 0., 0.],
-                                  [0., 0., 0., 0.],
+        self.kalman.Q = np.array([[_sim.dt ** 2, 0., 0., 0.],
+                                  [0., _sim.dt ** 2, 0., 0.],
                                   [0., 0., _sim.dt ** 2, 0.],
-                                  [0., 0., 0., _sim.dt ** 2]]) * self.kalnoise ** 2
+                                  [0., 0., 0., _sim.dt ** 2]]) * _sim.noiselevel ** 2
 
     def getwindow(self):
         """
@@ -263,10 +263,10 @@ class Drop(EDP):
         ax.set_xlim(0, 1200)
         ax.set_ylim(-300, 400)
         # plt.title('Measurement of a Cannonball in Flight')
-        plt.plot(field_ref[:, 0], field_ref[:, 2], '-',
-                 field_mes[:, 0], field_mes[:, 2], ':',
-                 field_sim[:, 0], field_sim[:, 2], '-',
-                 field_kal[:, 0], field_kal[:, 2], '--')
+        plt.plot(field_ref[:, 0], field_ref[:, 2], 'k--',
+                 field_mes[:, 0], field_mes[:, 2], '.',
+                 field_sim[:, 0], field_sim[:, 2], 'b-',
+                 field_kal[:, 0], field_kal[:, 2], 'r-')
         plt.legend(('reality', 'measured', 'simulated', 'kalman'))
         plt.show()
 

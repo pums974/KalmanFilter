@@ -10,10 +10,16 @@ from matplotlib import animation
 from matplotlib import cm
 from mpl_toolkits.mplot3d import Axes3D
 import sys
-if sys.version_info < (3,):
-    from kalman.libs.fortran_libs_py2 import derx_df2_f, dery_df2_f, derx_upwind_f, dery_upwind_f
-else:
-    from kalman.libs.fortran_libs_py3 import derx_df2_f, dery_df2_f, derx_upwind_f, dery_upwind_f
+try:
+    if sys.version_info < (3,):
+        from libs.fortran_libs_py2 import derx_df2_f, dery_df2_f, derx_upwind_f, dery_upwind_f
+    else:
+        from libs.fortran_libs_py3 import derx_df2_f, dery_df2_f, derx_upwind_f, dery_upwind_f
+except:
+    if sys.version_info < (3,):
+        from kalman.libs.fortran_libs_py2 import derx_df2_f, dery_df2_f, derx_upwind_f, dery_upwind_f
+    else:
+        from kalman.libs.fortran_libs_py3 import derx_df2_f, dery_df2_f, derx_upwind_f, dery_upwind_f
 
 
 use_fortran = True

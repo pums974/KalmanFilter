@@ -7,13 +7,20 @@ from __future__ import print_function, absolute_import
 import random
 import numpy as np
 import sys
-from kalman.kalman import KalmanFilter
-from kalman.tools import gc_clean
-
-if sys.version_info < (3,):
-    from kalman.libs.fortran_libs_py2 import gauss_f
-else:
-    from kalman.libs.fortran_libs_py3 import gauss_f
+try:
+    from kalman.kalman import KalmanFilter
+    from kalman.tools import gc_clean
+    if sys.version_info < (3,):
+        from kalman.libs.fortran_libs_py2 import gauss_f
+    else:
+        from kalman.libs.fortran_libs_py3 import gauss_f
+except:
+    from kalman import KalmanFilter
+    from tools import gc_clean
+    if sys.version_info < (3,):
+        from libs.fortran_libs_py2 import gauss_f
+    else:
+        from libs.fortran_libs_py3 import gauss_f
 
 use_fortran = True
 

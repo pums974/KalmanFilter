@@ -1,3 +1,4 @@
+
 #!/usr/bin/python2
 # coding=utf-8
 """
@@ -21,11 +22,12 @@
     * one animation of the simulation during time convergence
     * one animation of the filtered simulation during time convergence
 """
+
 # import cProfile
+import sys
 # import pstats
 # import os
 import time
-import sys
 
 Drop = True
 Chaleur = True
@@ -67,7 +69,7 @@ def run_a_test_case(edp):
     for i in range(1):
         edp.run_test_case(graphs)
     t2 = time.clock()
-    print("Elapsed " + str(t2-t1) + "s")
+    print("Elapsed " + str(t2 - t1) + "s")
 
 
 def run_all_tests_cases():

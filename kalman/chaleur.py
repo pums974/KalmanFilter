@@ -14,11 +14,17 @@
 """
 from __future__ import print_function, absolute_import
 import numpy as np
-
-from kalman.kalman import KalmanFilter
-from kalman.skeleton import *
-from kalman.grid import Grid_DF2
-from kalman.tools import gc_clean
+import matplotlib.pyplot as plt
+try:
+    from kalman.kalman import KalmanFilter
+    from kalman.skeleton import *
+    from kalman.grid import Grid_DF2
+    from kalman.tools import gc_clean
+except:
+    from kalman import KalmanFilter
+    from skeleton import *
+    from grid import Grid_DF2
+    from tools import gc_clean
 import math
 import sys
 
@@ -437,6 +443,7 @@ class Chaleur(EDP):
         Err_sim = self.grid.norm_inf(Sol_sim)
         Err_kal = self.grid.norm_inf(Sol_kal)
         print("%8.2e | %8.2e | %8.2e | %8.2e" % (Norm_ref, Err_mes, Err_sim, Err_kal))
+
 
 if __name__ == "__main__":
     Chaleur().run_test_case(False)
