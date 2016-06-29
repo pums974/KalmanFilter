@@ -11,16 +11,15 @@ from matplotlib import cm
 from mpl_toolkits.mplot3d import Axes3D
 import sys
 try:
-    if sys.version_info < (3,):
+    if sys.version_info < (3, ):
         from libs.fortran_libs_py2 import derx_df2_f, dery_df2_f, derx_upwind_f, dery_upwind_f
     else:
         from libs.fortran_libs_py3 import derx_df2_f, dery_df2_f, derx_upwind_f, dery_upwind_f
 except:
-    if sys.version_info < (3,):
+    if sys.version_info < (3, ):
         from kalman.libs.fortran_libs_py2 import derx_df2_f, dery_df2_f, derx_upwind_f, dery_upwind_f
     else:
         from kalman.libs.fortran_libs_py3 import derx_df2_f, dery_df2_f, derx_upwind_f, dery_upwind_f
-
 
 use_fortran = True
 
@@ -106,7 +105,8 @@ class Grid(object):
         """
         dx = self.derx(field)
         dy = self.dery(field)
-        return np.sqrt(np.sum(np.square(field)) + np.sum(np.square(dx)) + np.sum(np.square(dy)))
+        return np.sqrt(np.sum(np.square(field)) + np.sum(np.square(dx)) +
+                       np.sum(np.square(dy)))
 
     def norm_inf(self, field):
         """
@@ -124,11 +124,17 @@ class Grid(object):
         """
         fig = plt.figure()
         ax = fig.gca(projection='3d')
-        ax.set_xlim(self.coordx[1, 1], self.coordx[self.nx-1, self.ny-1])
-        ax.set_ylim(self.coordy[1, 1], self.coordy[self.nx-1, self.ny-1])
+        ax.set_xlim(self.coordx[1, 1], self.coordx[self.nx - 1, self.ny - 1])
+        ax.set_ylim(self.coordy[1, 1], self.coordy[self.nx - 1, self.ny - 1])
         ax.set_zlim(0, 1)
-        surf = ax.plot_surface(self.coordx, self.coordy, field, rstride=1,
-                               cstride=1, cmap=cm.coolwarm, linewidth=0, antialiased=False)
+        surf = ax.plot_surface(self.coordx,
+                               self.coordy,
+                               field,
+                               rstride=1,
+                               cstride=1,
+                               cmap=cm.coolwarm,
+                               linewidth=0,
+                               antialiased=False)
         fig.colorbar(surf, shrink=0.5, aspect=5)
         plt.show()
 
@@ -146,21 +152,33 @@ class Grid(object):
             :return: surface to be plotted
             """
             ax.clear()
-            surf = ax.plot_surface(self.coordx, self.coordy, simu.getsol(), rstride=1,
-                                   cstride=1, cmap=cm.coolwarm, linewidth=0, antialiased=False)
-            ax.set_xlim(self.coordx[1, 1], self.coordx[self.nx-1, self.ny-1])
-            ax.set_ylim(self.coordy[1, 1], self.coordy[self.nx-1, self.ny-1])
+            surf = ax.plot_surface(self.coordx,
+                                   self.coordy,
+                                   simu.getsol(),
+                                   rstride=1,
+                                   cstride=1,
+                                   cmap=cm.coolwarm,
+                                   linewidth=0,
+                                   antialiased=False)
+            ax.set_xlim(self.coordx[1, 1],
+                        self.coordx[self.nx - 1, self.ny - 1])
+            ax.set_ylim(self.coordy[1, 1],
+                        self.coordy[self.nx - 1, self.ny - 1])
             ax.set_zlim(0, 1)
             ax.set_title('It = ' + str(i) + ',\n err = ' + str(simu.err))
             return surf,
 
         fig = plt.figure()
         ax = fig.gca(projection='3d')
-        ax.set_xlim(self.coordx[1, 1], self.coordx[self.nx-1, self.ny-1])
-        ax.set_ylim(self.coordy[1, 1], self.coordy[self.nx-1, self.ny-1])
+        ax.set_xlim(self.coordx[1, 1], self.coordx[self.nx - 1, self.ny - 1])
+        ax.set_ylim(self.coordy[1, 1], self.coordy[self.nx - 1, self.ny - 1])
         ax.set_zlim(0, 1)
 
-        _ = animation.FuncAnimation(fig, plot_update, compute(simu), blit=False, interval=10,
+        _ = animation.FuncAnimation(fig,
+                                    plot_update,
+                                    compute(simu),
+                                    blit=False,
+                                    interval=10,
                                     repeat=False)
         plt.show()
 
@@ -179,22 +197,34 @@ class Grid(object):
             :return: surface to be plotted
             """
             ax.clear()
-            surf = ax.plot_surface(self.coordx, self.coordy, simu.getsolwithnoise(), rstride=1,
-                                   cstride=1, cmap=cm.coolwarm, linewidth=0, antialiased=False)
+            surf = ax.plot_surface(self.coordx,
+                                   self.coordy,
+                                   simu.getsolwithnoise(),
+                                   rstride=1,
+                                   cstride=1,
+                                   cmap=cm.coolwarm,
+                                   linewidth=0,
+                                   antialiased=False)
             simu.err = norm(simu.getsol() - simu.getsolwithnoise())
-            ax.set_xlim(self.coordx[1, 1], self.coordx[self.nx-1, self.ny-1])
-            ax.set_ylim(self.coordy[1, 1], self.coordy[self.nx-1, self.ny-1])
+            ax.set_xlim(self.coordx[1, 1],
+                        self.coordx[self.nx - 1, self.ny - 1])
+            ax.set_ylim(self.coordy[1, 1],
+                        self.coordy[self.nx - 1, self.ny - 1])
             ax.set_zlim(0, 1)
             ax.set_title('It = ' + str(i) + ',\n err = ' + str(simu.err))
             return surf,
 
         fig = plt.figure()
         ax = fig.gca(projection='3d')
-        ax.set_xlim(self.coordx[1, 1], self.coordx[self.nx-1, self.ny-1])
-        ax.set_ylim(self.coordy[1, 1], self.coordy[self.nx-1, self.ny-1])
+        ax.set_xlim(self.coordx[1, 1], self.coordx[self.nx - 1, self.ny - 1])
+        ax.set_ylim(self.coordy[1, 1], self.coordy[self.nx - 1, self.ny - 1])
         ax.set_zlim(0, 1)
 
-        _ = animation.FuncAnimation(fig, plot_update, compute(simu), blit=False, interval=10,
+        _ = animation.FuncAnimation(fig,
+                                    plot_update,
+                                    compute(simu),
+                                    blit=False,
+                                    interval=10,
                                     repeat=False)
         plt.show()
 
@@ -232,7 +262,8 @@ class Grid_DF2(Grid):
         for k in range(start, end):
             mini_mat[0][k - start] = 1
             mini_mat[1][k - start] = self.coordx[k][j] - self.coordx[i][j]
-            mini_mat[2][k - start] = 0.5 * ((self.coordx[k][j] - self.coordx[i][j]) ** 2.)
+            mini_mat[2][k - start] = 0.5 * \
+                ((self.coordx[k][j] - self.coordx[i][j]) ** 2.)
         mini_mat = np.linalg.inv(mini_mat)
         return mini_mat.dot(der)
 
@@ -251,7 +282,8 @@ class Grid_DF2(Grid):
         for k in range(start, end):
             mini_mat[0][k - start] = 1
             mini_mat[1][k - start] = self.coordy[i][k] - self.coordy[i][j]
-            mini_mat[2][k - start] = 0.5 * ((self.coordy[i][k] - self.coordy[i][j]) ** 2.)
+            mini_mat[2][k - start] = 0.5 * \
+                ((self.coordy[i][k] - self.coordy[i][j]) ** 2.)
         mini_mat = np.linalg.inv(mini_mat)
         return mini_mat.dot(der)
 
@@ -271,7 +303,8 @@ class Grid_DF2(Grid):
                     end = min([start + 3, self.nx])
                     start = end - 3
                     for k in range(start, end):
-                        derx[i][j] += field[k][j] * self.mat_derx[i][j][k - start]
+                        derx[i][j] += field[k][j] * \
+                            self.mat_derx[i][j][k - start]
         return derx
 
     def dderx(self, field):
@@ -290,7 +323,8 @@ class Grid_DF2(Grid):
                     end = min([start + 3, self.nx])
                     start = end - 3
                     for k in range(start, end):
-                        dderx[i][j] += field[k][j] * self.mat_dderx[i][j][k - start]
+                        dderx[i][j] += field[k][j] * \
+                            self.mat_dderx[i][j][k - start]
         return dderx
 
     def dery(self, field):
@@ -309,7 +343,8 @@ class Grid_DF2(Grid):
                     end = min([start + 3, self.ny])
                     start = end - 3
                     for k in range(start, end):
-                        dery[i][j] += field[i][k] * self.mat_dery[i][j][k - start]
+                        dery[i][j] += field[i][k] * \
+                            self.mat_dery[i][j][k - start]
         return dery
 
     def ddery(self, field):
@@ -328,7 +363,8 @@ class Grid_DF2(Grid):
                     end = min([start + 3, self.ny])
                     start = end - 3
                     for k in range(start, end):
-                        ddery[i][j] += field[i][k] * self.mat_ddery[i][j][k - start]
+                        ddery[i][j] += field[i][k] * \
+                            self.mat_ddery[i][j][k - start]
         return ddery
 
 
@@ -357,9 +393,11 @@ class Grid_Upwind(Grid):
                     ap = max([self.velofield[i][j][0], 0.]) * 0.5
                     am = min([self.velofield[i][j][0], 0.]) * 0.5
                     if i > 0:
-                        derx[i][j] += ap * (field[i][j] - field[i - 1][j]) * rdx
+                        derx[i][j] += ap * \
+                            (field[i][j] - field[i - 1][j]) * rdx
                     if i < self.nx - 1:
-                        derx[i][j] += am * (field[i + 1][j] - field[i][j]) * rdx
+                        derx[i][j] += am * \
+                            (field[i + 1][j] - field[i][j]) * rdx
         return derx
 
     def dery(self, field):
@@ -378,7 +416,9 @@ class Grid_Upwind(Grid):
                     ap = max([self.velofield[i][j][1], 0.]) * 0.5
                     am = min([self.velofield[i][j][1], 0.]) * 0.5
                     if j > 0:
-                        dery[i][j] += ap * (field[i][j] - field[i][j - 1]) * rdy
+                        dery[i][j] += ap * \
+                            (field[i][j] - field[i][j - 1]) * rdy
                     if j < self.ny - 1:
-                        dery[i][j] += am * (field[i][j + 1] - field[i][j]) * rdy
+                        dery[i][j] += am * \
+                            (field[i][j + 1] - field[i][j]) * rdy
         return dery

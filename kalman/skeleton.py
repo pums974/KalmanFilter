@@ -10,21 +10,21 @@ import sys
 try:
     from kalman.kalman import KalmanFilter
     from kalman.tools import gc_clean
-    if sys.version_info < (3,):
+    if sys.version_info < (3, ):
         from kalman.libs.fortran_libs_py2 import gauss_f
     else:
         from kalman.libs.fortran_libs_py3 import gauss_f
 except:
     from kalman import KalmanFilter
     from tools import gc_clean
-    if sys.version_info < (3,):
+    if sys.version_info < (3, ):
         from libs.fortran_libs_py2 import gauss_f
     else:
         from libs.fortran_libs_py3 import gauss_f
 
 use_fortran = True
 
-if sys.version_info < (3,):
+if sys.version_info < (3, ):
     range = xrange
 
 
@@ -33,7 +33,7 @@ class SkelReality(object):
         This class contains the analytical solution of our problem
         It also provide way to get a noisy field around this solution
     """
-    It = - 1
+    It = -1
     nIt = 0
     err = 999.
     dt = 0.
@@ -77,7 +77,8 @@ class SkelReality(object):
         #                              for d in self.field.flat]).reshape(self.field.shape)
         # return self.addnoisev(self.field)
         if use_fortran:
-            return gauss_f(self.field.flat, self.noiselevel).reshape(self.field.shape)
+            return gauss_f(self.field.flat,
+                           self.noiselevel).reshape(self.field.shape)
         else:
             return self.addnoisev(self.field)
 
@@ -97,7 +98,7 @@ class SkelReality(object):
         """
             reinitialize the iteration number
         """
-        self.It = - 1
+        self.It = -1
         self.step()
 
 
@@ -105,7 +106,7 @@ class SkelSimulation(object):
     """
     This class contains everything for the simulation
     """
-    It = - 1
+    It = -1
     nIt = 0
     err = 999.
     dt = 0.
@@ -151,7 +152,7 @@ class SkelKalmanWrapper(object):
     """
         This class is use around the simulation to apply the kalman filter
     """
-    It = - 1
+    It = -1
     nIt = 0
     err = 999.
     dt = 0.
@@ -169,9 +170,15 @@ class SkelKalmanWrapper(object):
 
         _M = self.getwindow()  # Observation matrix.
         self.kalman = KalmanFilter(self.kalsim, _M)
-        self.kalman.S = np.eye(self.kalman.size_s) * self.reality.noiselevel ** 2   # Initial covariance estimate.
-        self.kalman.R = np.eye(self.kalman.size_o) * self.reality.noiselevel ** 2   # Estimated error in measurements.
-        self.kalman.Q = np.eye(self.kalman.size_s) * self.kalsim.noiselevel ** 2    # Estimated error in process.
+        # Initial covariance estimate.
+        self.kalman.S = np.eye(self.kalman.size_s) * \
+            self.reality.noiselevel ** 2
+        # Estimated error in measurements.
+        self.kalman.R = np.eye(self.kalman.size_o) * \
+            self.reality.noiselevel ** 2
+        # Estimated error in process.
+        self.kalman.Q = np.eye(self.kalman.size_s) * \
+            self.kalsim.noiselevel ** 2
         gc_clean()
 
     def getwindow(self):
@@ -187,7 +194,8 @@ class SkelKalmanWrapper(object):
             Reshape noisy field and gives it to the kalman filter
         :param field:
         """
-        self.kalman.Y = self.kalman.M.dot(np.reshape(field, self.kalman.size_s))
+        self.kalman.Y = self.kalman.M.dot(np.reshape(field,
+                                                     self.kalman.size_s))
 
     def getsol(self):
         """

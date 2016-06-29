@@ -26,7 +26,7 @@ except:
     from grid import Grid_Upwind
 import math
 
-if sys.version_info < (3,):
+if sys.version_info < (3, ):
     range = xrange
 
 
@@ -35,7 +35,9 @@ class Reality(SkelReality):
         This class contains the analytical solution of our problem
         It also provide way to get a noisy field around this solution
     """
+
     # ---------------------------------METHODS-----------------------------------
+
     def __init__(self, _grid, _dtheta, _noiselevel, _dt):
         self.grid = _grid
         SkelReality.__init__(self, _noiselevel, _dt, _grid.shape)
@@ -82,8 +84,10 @@ class Simulation(SkelSimulation):
             for j in range(ny):
                 self.field = np.zeros([nx, ny])
                 self.field[i, j] = self.dt
-                self.Mat[indx(i, j)] -= np.reshape(self.grid.derx(self.field), [self.size])
-                self.Mat[indx(i, j)] -= np.reshape(self.grid.dery(self.field), [self.size])
+                self.Mat[indx(i, j)] -= np.reshape(
+                    self.grid.derx(self.field), [self.size])
+                self.Mat[indx(i, j)] -= np.reshape(
+                    self.grid.dery(self.field), [self.size])
         self.Mat = self.Mat.transpose()
         # rhs and boundary conditions
         for j in range(ny):
@@ -121,20 +125,29 @@ class KalmanWrapper(SkelKalmanWrapper):
     """
         This class is use around the simulation to apply the kalman filter
     """
+
     def __init__(self, _reality, _sim):
         SkelKalmanWrapper.__init__(self, _reality, _sim)
-        self.kalman.S = np.eye(self.kalman.size_s) * 0.  # Initial covariance estimate.
-        self.kalman.R = np.eye(self.kalman.size_o) * self.reality.noiselevel ** 2  # Estimated error in measurements.
-
         indx = self.kalsim.grid.indx
+
+        # Initial covariance estimate.
+        self.kalman.S = np.eye(self.kalman.size_s) * 0.
+
+        # Estimated error in measurements.
+        self.kalman.R = np.eye(self.kalman.size_o) * \
+            self.reality.noiselevel ** 2
+
+        # Estimated error in process.
         # G = np.zeros([self.kalman.size_s, 1])
         # for i in range(self.kalsim.grid.nx):
         #     for j in range(self.kalsim.grid.ny):
         #         G[indx(i, j)] = self.kalsim.grid.dx ** 2 / 2. \
         #                         + self.kalsim.grid.dy ** 2 / 2. \
         #                         + self.kalsim.dt ** 2 / 2.
-        # self.kalman.Q = G.dot(np.transpose(G)) * self.kalsim.noiselevel ** 2  # Estimated error in process.
-        self.kalman.Q = np.eye(self.kalman.size_s) * self.kalsim.noiselevel ** 2  # Estimated error in process.
+        # self.kalman.Q = G.dot(np.transpose(G)) * self.kalsim.noiselevel ** 2
+
+        self.kalman.Q = np.eye(self.kalman.size_s) * \
+            self.kalsim.noiselevel ** 2
 
     def getwindow(self):
         """
@@ -151,7 +164,8 @@ class KalmanWrapper(SkelKalmanWrapper):
             Extract the solution from kalman filter : has to reshape it
         :return: current solution
         """
-        return np.reshape(self.kalman.X, [self.kalsim.grid.nx, self.kalsim.grid.ny])
+        return np.reshape(self.kalman.X,
+                          [self.kalsim.grid.nx, self.kalsim.grid.ny])
 
     def setsol(self, field):
         """
@@ -188,11 +202,14 @@ class Convection(EDP):
         self.grid = Grid_Upwind(self.nx, self.ny, self.Lx, self.Ly)
         for i in range(self.nx):
             for j in range(self.ny):
-                self.grid.velofield[i][j][0] = - self.grid.coordy[i][j] * self.dtheta
-                self.grid.velofield[i][j][1] = self.grid.coordx[i][j] * self.dtheta
+                self.grid.velofield[i][j][0] = - \
+                    self.grid.coordy[i][j] * self.dtheta
+                self.grid.velofield[i][j][1] = self.grid.coordx[i][
+                    j] * self.dtheta
         self.reinit()
         maxa = np.max(self.grid.velofield)
-        print("cfl = ", maxa * max([self.dt / self.grid.dx, self.dt / self.grid.dy]))
+        print("cfl = ",
+              maxa * max([self.dt / self.grid.dx, self.dt / self.grid.dy]))
         print("dt = ", self.dt)
         print("Norme Linf |   simu   |  kalman")
 
@@ -206,7 +223,8 @@ class Convection(EDP):
 
         self.dt = self.simulation.dt
         self.nIt = int(self.T_fin / self.dt) + 1
-        self.reality = Reality(self.grid, self.dtheta, self.noise_real, self.dt)
+        self.reality = Reality(self.grid, self.dtheta, self.noise_real,
+                               self.dt)
 
         self.simulation.nIt = self.nIt
         self.kalsim.nIt = self.nIt
@@ -262,7 +280,7 @@ class Convection(EDP):
         """
         self.reinit()
 
-        # ----------------- Compute reality and measurement --------------------
+        # ----------------- Compute reality and measurement -------------------
         if graphs:
             self.animate(self.reality)
         else:
@@ -276,7 +294,7 @@ class Convection(EDP):
         Norm_ref = self.norm(Sol_ref)
         Err_mes = self.norm(Sol_ref - Sol_mes) / Norm_ref
 
-        # ------------------------ Compute simulation without Kalman ----------------------------
+        # ------------------------ Compute simulation without Kalman ----------
         self.reality.reinit()
         # Initial solution
         self.simulation.setsol(self.reality.getsol())
@@ -288,7 +306,7 @@ class Convection(EDP):
         Sol_sim = self.simulation.getsol()
         Err_sim = self.norm(Sol_ref - Sol_sim) / Norm_ref
 
-        # ------------------------ Compute simulation with Kalman ----------------------------
+        # ------------------------ Compute simulation with Kalman -------------
         self.reality.reinit()
         # Initial solution
         self.kalman.setsol(self.reality.getsol())
@@ -303,8 +321,10 @@ class Convection(EDP):
 
         # ------------------------ Final output ----------------------------
 
-        print("%8.2e   | %8.2e | %8.2e" % (np.max(Sol_ref), np.max(Sol_sim), np.max(Sol_kal)))
-        print("%8.2e | %8.2e | %8.2e | %8.2e" % (Norm_ref, Err_mes, Err_sim, Err_kal))
+        print("%8.2e   | %8.2e | %8.2e" %
+              (np.max(Sol_ref), np.max(Sol_sim), np.max(Sol_kal)))
+        print("%8.2e | %8.2e | %8.2e | %8.2e" %
+              (Norm_ref, Err_mes, Err_sim, Err_kal))
 
         if graphs:
             """
@@ -326,8 +346,14 @@ class Convection(EDP):
                      self.grid.coordy[int(self.nx / 2), :], Sol_mes[int(self.nx / 2), :], 'o',
                      self.grid.coordy[int(self.nx / 2), :], Sol_sim[int(self.nx / 2), :], 'b-',
                      self.grid.coordy[int(self.nx / 2), :], Sol_kal[int(self.nx / 2), :], 'r-')
-            plt.legend(('Analytic', 'Disturbed', 'Simulated', 'Filtered'), loc=2)
+            plt.legend(
+                ('Analytic',
+                 'Disturbed',
+                 'Simulated',
+                 'Filtered'),
+                loc=2)
             plt.show()
+
 
 if __name__ == "__main__":
     Convection().run_test_case(False)

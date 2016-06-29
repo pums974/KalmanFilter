@@ -9,20 +9,20 @@ import sys
 import matplotlib.pyplot as plt
 try:
     from kalman.tools import gc_clean
-    if sys.version_info < (3,):
+    if sys.version_info < (3, ):
         from kalman.libs.fortran_libs_py2 import kalman_apply_f
     else:
         from kalman.libs.fortran_libs_py3 import kalman_apply_f
 except:
     from tools import gc_clean
-    if sys.version_info < (3,):
+    if sys.version_info < (3, ):
         from libs.fortran_libs_py2 import kalman_apply_f
     else:
         from libs.fortran_libs_py3 import kalman_apply_f
 
 use_fortran = True
 
-if sys.version_info < (3,):
+if sys.version_info < (3, ):
     range = xrange
 
 
@@ -30,6 +30,7 @@ class KalmanFilter(object):
     """
         This contains everything for our Kalman filter independently of the test case
     """
+
     def __init__(self, _simulation, _M):
         self.simulation = _simulation
         self.size_s = _simulation.Mat.shape[0]
@@ -39,9 +40,12 @@ class KalmanFilter(object):
 
         self.Phi = _simulation.Mat  # State transition matrix.
         self.M = _M  # Observation matrix.
-        self.R = np.zeros([self.size_o, self.size_o])  # Estimated error in measurements.
-        self.Q = np.zeros([self.size_s, self.size_s])  # Estimated error in process.
-        self.S = np.zeros([self.size_s, self.size_s])  # Initial covariance estimate.
+        # Estimated error in measurements.
+        self.R = np.zeros([self.size_o, self.size_o])
+        # Estimated error in process.
+        self.Q = np.zeros([self.size_s, self.size_s])
+        # Initial covariance estimate.
+        self.S = np.zeros([self.size_s, self.size_s])
         self.X = np.zeros(self.size_s)
         self.Y = np.zeros(self.size_o)
         self.Id = np.eye(self.size_s)
@@ -73,18 +77,21 @@ class KalmanFilter(object):
         """
         self.counter += 1
         if use_fortran and self.counter != self.counterplot:
-            self.S, X = kalman_apply_f(self.Phi, self.S, self.Q, self.M, self.R, self.Y, self.X)
+            self.S, X = kalman_apply_f(self.Phi, self.S, self.Q, self.M,
+                                       self.R, self.Y, self.X)
             self.X = X.flatten()
         else:
-            # -------------------------Prediction step-----------------------------
+            # -------------------------Prediction step-------------------------
             self.S = self.Phi.dot(self.S).dot(np.transpose(self.Phi)) + self.Q
 
-            # ------------------------Observation step-----------------------------
-            innovation_covariance = self.M.dot(self.S).dot(np.transpose(self.M)) + self.R
+            # ------------------------Observation step-------------------------
+            innovation_covariance = self.M.dot(self.S).dot(np.transpose(
+                self.M)) + self.R
             innovation = self.Y - self.M.dot(self.X)
 
-            # ---------------------------Update step-------------------------------
-            K = self.S.dot(np.transpose(self.M)).dot(np.linalg.inv(innovation_covariance))
+            # ---------------------------Update step---------------------------
+            K = self.S.dot(np.transpose(self.M)).dot(np.linalg.inv(
+                innovation_covariance))
             self.X = self.X + K.dot(innovation)
 
             self.S = (self.Id - K.dot(self.M)).dot(self.S)

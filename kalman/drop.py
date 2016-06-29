@@ -1,53 +1,59 @@
 #!/usr/bin/python2
 # coding=utf-8
 """
-    Drop will solve the problem
-    a = - g - h v
-    and use the Kalman filter to mix
-    1st order simulation and noisy measurements
-    In order to produce a trajectory closer to the analytic solution
-    The result is one plot
-"""
+This is a test case for kalman filter.
 
-from __future__ import print_function, absolute_import
+Drop will solve the problem
+a = - g - h v
+and use the Kalman filter to mix
+1st order simulation and noisy measurements
+In order to produce a trajectory closer to the analytic solution
+The result is one plot
+"""
+from __future__ import absolute_import, print_function
+
 import math
-import numpy as np
+import random
+
 import matplotlib.pyplot as plt
+import numpy as np
+
 try:
     from kalman.kalman import KalmanFilter
     from kalman.skeleton import *
-    if sys.version_info < (3,):
+    if sys.version_info < (3, ):
         from kalman.libs.fortran_libs_py2 import gauss_f
     else:
         from kalman.libs.fortran_libs_py3 import gauss_f
 except:
     from kalman import KalmanFilter
     from skeleton import *
-    if sys.version_info < (3,):
+    if sys.version_info < (3, ):
         from libs.fortran_libs_py2 import gauss_f
     else:
         from libs.fortran_libs_py3 import gauss_f
-import random
 
 use_fortran = True
 
-
-if sys.version_info < (3,):
+if sys.version_info < (3, ):
     range = xrange
 
 
 class Reality(SkelReality):
     """
-        This class contains the analytical solution of our problem
-        It also provide way to get a noisy field around this solution
+    This class contains the analytical solution of our problem.
+
+    It also provide way to get a noisy field around this solution
     """
-    g = - 9.81
+
+    g = -9.81
     power = 100.
     dir = 45.
     frot = 0.0
 
     # ---------------------------------METHODS-----------------------------------
     def __init__(self, _dt, _noiselevel):
+        """Initilisation."""
         SkelReality.__init__(self, _noiselevel, _dt, [4])
         self.init = np.array([0.,
                               self.power * math.cos(self.dir * math.pi / 180.),
@@ -55,9 +61,7 @@ class Reality(SkelReality):
                               self.power * math.sin(self.dir * math.pi / 180.)])
 
     def step(self):
-        """
-            Compute the analytical solution
-        """
+        """Compute the analytical solution."""
         # self.field = np.zeros([self.size])
         self.It += 1
         time = self.It * self.dt
@@ -83,22 +87,23 @@ class Reality(SkelReality):
         # x(0) = (0, 0)
         self.field[0] = self.init[0] + self.init[1] * time
         self.field[1] = self.init[1]
-        self.field[2] = self.init[2] + self.init[3] * time + 0.5 * self.g * time * time
+        self.field[2] = self.init[2] + self.init[3] * time \
+            + 0.5 * self.g * time * time
         self.field[3] = self.init[3] + self.g * time
 
 
 class Simulation(SkelSimulation):
-    """
-    This class contains everything for the simulation
-    """
+    """This class contains everything for the simulation."""
+
     # --------------------------------PARAMETERS--------------------------------
     power = 100
     dir = 45
-    g = - 9.81
+    g = -9.81
     frot = 0.0
 
     # ---------------------------------METHODS-----------------------------------
     def __init__(self, _dt, _noiselevel):
+        """Initilisation."""
         SkelSimulation.__init__(self, _noiselevel, _dt, [4])
 
         # x_n+1 = x_n + dt * v_n + O(dt^2)
@@ -119,9 +124,7 @@ class Simulation(SkelSimulation):
                              +c6 * self.g])
 
     def step(self):
-        """
-            Increment through the next time step of the simulation.
-        """
+        """Increment through the next time step of the simulation."""
         c3 = 0.5 * self.dt * self.dt
         c6 = self.dt
         if use_fortran:
@@ -138,20 +141,26 @@ class Simulation(SkelSimulation):
 
 
 class KalmanWrapper(SkelKalmanWrapper):
-    """
-        This class is use around the simulation to apply the kalman filter
-    """
-    def __init__(self, _reality, _sim):
-        SkelKalmanWrapper.__init__(self, _reality, _sim)
-        self.kalman.S = np.eye(self.kalman.size_s) * 0.  # Initial covariance estimate.
-        self.kalman.R = np.eye(self.kalman.size_o) * self.reality.noiselevel ** 2  # Estimated error in measurements.
+    """This class is use around the simulation to apply the kalman filter."""
 
+    def __init__(self, _reality, _sim):
+        """Initilisation."""
+        SkelKalmanWrapper.__init__(self, _reality, _sim)
+
+        # Initial covariance estimate.
+        self.kalman.S = np.eye(self.kalman.size_s) * 0.
+
+        # Estimated error in measurements.
+        self.kalman.R = np.eye(self.kalman.size_o) * \
+            self.reality.noiselevel ** 2
+
+        # Estimated error in process.
         # G = np.array([[_sim.dt],
         #               [_sim.dt ** 2 * 0.5],
         #               [_sim.dt],
         #               [_sim.dt**2 * 0.5]])
-        # self.kalman.Q = G.dot(np.transpose(G)) * self.kalnoise ** 2   # Estimated error in process.
-        # self.kalman.Q = np.eye(self.kalman.size_s) * self.kalnoise ** 2  # Estimated error in process.
+        # self.kalman.Q = G.dot(np.transpose(G)) * self.kalnoise ** 2
+        # self.kalman.Q = np.eye(self.kalman.size_s) * self.kalnoise ** 2
         self.kalman.Q = np.array([[_sim.dt ** 2, 0., 0., 0.],
                                   [0., _sim.dt ** 2, 0., 0.],
                                   [0., 0., _sim.dt ** 2, 0.],
@@ -159,10 +168,10 @@ class KalmanWrapper(SkelKalmanWrapper):
 
     def getwindow(self):
         """
-            Produce the observation matrix : designate what we conserve of the noisy field
+        Produce the observation matrix : designate what we conserve of the noisy field.
+
         :return: observation matrix
         """
-
         M = np.array([[1, 0, 0, 0],
                       [0, 0, 1, 0]])
 
@@ -171,22 +180,24 @@ class KalmanWrapper(SkelKalmanWrapper):
 
     def setmes(self, field):
         """
+        Set the measured field.
 
-        :param field:
+        :param field:measured field
         """
         self.kalman.Y = self.kalman.M.dot(field)
 
     def getsol(self):
         """
-            Extract the solution from the kalman filter
-            Its dim goes from (n,1) to (n)
-        :return:
+        Extract the solution from the kalman filter.
+
+        Its dim goes from (n,1) to (n)
         """
         return self.kalman.X.flatten()
 
     def setsol(self, field):
         """
-            Set the current solution, we have to add a dummy dimension for the kalman filter
+        Set the current solution, we have to add a dummy dimension for the kalman filter.
+
         :param field: field
         """
         self.kalman.X = field
@@ -195,12 +206,15 @@ class KalmanWrapper(SkelKalmanWrapper):
 
 class Drop(EDP):
     """
-        This class contains everything for this test case :
-        * The analytical solution
-        * A simulation
-        * A filtered simulation
-        * how to plot the results
+    This class contains everything for the drop test case.
+
+    In particular it contains
+    * The analytical solution
+    * A simulation
+    * A filtered simulation
+    * how to plot the results
     """
+
     Tfin = 15.
     nIt = 300
     noise_real = 20
@@ -209,16 +223,14 @@ class Drop(EDP):
     name = "Drop"
 
     def __init__(self):
+        """Initilisation."""
         EDP.__init__(self)
         print("Norme L2 |  mesure  |   simu   |  kalman")
 
         self.reinit()
 
     def reinit(self):
-        """
-            Reinit everything
-        :return:
-        """
+        """Reinit everything."""
         self.simulation = Simulation(self.dt, self.noise_sim)
         self.kalsim = Simulation(self.dt, self.noise_sim)
 
@@ -234,7 +246,8 @@ class Drop(EDP):
     @staticmethod
     def plot(field):
         """
-            plot one trajectory
+        Plot one trajectory.
+
         :param field: field
         """
         fig = plt.figure()
@@ -250,7 +263,8 @@ class Drop(EDP):
     @staticmethod
     def plotall(field_ref, field_mes, field_sim, field_kal):
         """
-            Plot all the trajectory on the same graph
+        Plot all the trajectory on the same graph.
+
         :param field_ref: the analytical solution
         :param field_mes: a noisy trajectory around the analytical solution
         :param field_sim: a simulated trajectory
@@ -271,10 +285,7 @@ class Drop(EDP):
         plt.show()
 
     def run_test_case(self, graphs):
-        """
-            Run the test case
-        :return:
-        """
+        """Run the test case."""
         self.reinit()
 
         Sol_ref = np.zeros([self.nIt, 4])
@@ -282,7 +293,7 @@ class Drop(EDP):
         Sol_sim = np.zeros([self.nIt, 4])
         Sol_kal = np.zeros([self.nIt, 4])
 
-        # ----------------- Compute reality and measurement --------------------
+        # ----------------- Compute reality and measurement -------------------
         for it in self.compute(self.reality):
             Sol_ref[it, :] = self.reality.getsol()
             Sol_mes[it, :] = self.reality.getsolwithnoise()
@@ -290,7 +301,7 @@ class Drop(EDP):
         Norm_ref = self.norm(Sol_ref)
         Err_mes = self.norm(Sol_ref - Sol_mes) / Norm_ref
 
-        # ------------------------ Compute simulation without Kalman ----------------------------
+        # ------------------------ Compute simulation without Kalman ----------
         self.reality.reinit()
         # Initial solution
         self.simulation.setsol(self.reality.getsol())
@@ -300,7 +311,7 @@ class Drop(EDP):
 
         Err_sim = self.norm(Sol_ref - Sol_sim) / Norm_ref
 
-        # ------------------------ Compute simulation with Kalman ----------------------------
+        # ------------------------ Compute simulation with Kalman -------------
 
         self.reality.reinit()
         # Initial solution
@@ -313,9 +324,11 @@ class Drop(EDP):
 
         # ------------------------ Final output ----------------------------
 
-        print("%8.2e | %8.2e | %8.2e | %8.2e" % (Norm_ref, Err_mes, Err_sim, Err_kal))
+        print("%8.2e | %8.2e | %8.2e | %8.2e" %
+              (Norm_ref, Err_mes, Err_sim, Err_kal))
         if graphs:
             self.plotall(Sol_ref, Sol_mes, Sol_sim, Sol_kal)
+
 
 if __name__ == "__main__":
     Drop().run_test_case(False)

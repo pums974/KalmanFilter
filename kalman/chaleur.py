@@ -28,7 +28,7 @@ except:
 import math
 import sys
 
-if sys.version_info < (3,):
+if sys.version_info < (3, ):
     range = xrange
 
 
@@ -37,24 +37,25 @@ class Reality(SkelReality):
         This class contains the analytical solution of our problem
         It also provide way to get a noisy field around this solution
     """
+
     # ---------------------------------METHODS-----------------------------------
 
     def __init__(self, _grid, _power, _noiselevel, _dt):
         self.grid = _grid
         SkelReality.__init__(self, _noiselevel, _dt, _grid.shape)
         self.power = _power
-        c1 = 16 * _power/(math.pi ** 2)
+        c1 = 16 * _power / (math.pi**2)
         c2 = math.pi / self.grid.Lx
         c3 = 0.5 * math.pi / self.grid.Ly
-        c4 = math.pi * math.pi / (4. * self.grid.Ly ** 2)
-        c5 = math.pi * math.pi / (self.grid.Lx ** 2)
+        c4 = math.pi * math.pi / (4. * self.grid.Ly**2)
+        c5 = math.pi * math.pi / (self.grid.Lx**2)
         add = np.zeros([self.grid.nx, self.grid.ny])
         self.nmode = 1
         self.mmode = 1
         self.initfield = np.zeros([self.grid.nx, self.grid.ny])
-        for m in range(1, self.nmode+1):
-            for n in range(1, self.mmode+1):
-                c10 = c1 / ((2. * n - 1.)*(2. * m - 1.))
+        for m in range(1, self.nmode + 1):
+            for n in range(1, self.mmode + 1):
+                c10 = c1 / ((2. * n - 1.) * (2. * m - 1.))
                 c20 = c2 * (2. * n - 1.)
                 c30 = c3 * (2. * m - 1.)
                 for i in range(self.grid.nx):
@@ -76,12 +77,12 @@ class Reality(SkelReality):
         self.field = np.zeros([self.grid.nx, self.grid.ny])
         self.It += 1
         time = self.It * self.dt
-        c4 = math.pi * math.pi / (4. * self.grid.Ly ** 2)
-        c5 = math.pi * math.pi / (self.grid.Lx ** 2)
-        for m in range(1, self.nmode+1):
-            for n in range(1, self.mmode+1):
-                c40 = c4 * (2. * n - 1.) ** 2
-                c50 = c5 * (2. * m - 1.) ** 2
+        c4 = math.pi * math.pi / (4. * self.grid.Ly**2)
+        c5 = math.pi * math.pi / (self.grid.Lx**2)
+        for m in range(1, self.nmode + 1):
+            for n in range(1, self.mmode + 1):
+                c40 = c4 * (2. * n - 1.)**2
+                c50 = c5 * (2. * m - 1.)**2
                 self.field = self.initfield * math.exp(-(c40 + c50) * time)
 
 
@@ -95,7 +96,7 @@ class Simulation(SkelSimulation):
     # ---------------------------------METHODS-----------------------------------
     def __init__(self, _grid, _power, _noiselevel):
         self.grid = _grid
-        self.dt = min([self.grid.dx ** 2, self.grid.dy ** 2]) * self.cfl
+        self.dt = min([self.grid.dx**2, self.grid.dy**2]) * self.cfl
 
         SkelSimulation.__init__(self, _noiselevel, self.dt, self.grid.shape)
         self.power = _power
@@ -125,8 +126,10 @@ class Simulation(SkelSimulation):
             for j in range(ny):
                 self.field = np.zeros([nx, ny])
                 self.field[i, j] = self.dt
-                self.Mat[indx(i, j)] += np.reshape(self.grid.dderx(self.field), [self.size])
-                self.Mat[indx(i, j)] += np.reshape(self.grid.ddery(self.field), [self.size])
+                self.Mat[indx(i, j)] += np.reshape(
+                    self.grid.dderx(self.field), [self.size])
+                self.Mat[indx(i, j)] += np.reshape(
+                    self.grid.ddery(self.field), [self.size])
         self.Mat = self.Mat.transpose()
 
     def calcmatbc(self):
@@ -188,7 +191,7 @@ class Simulation(SkelSimulation):
             else:
                 der = self.grid.dery
 
-            self.field[indx(_i, _j)] = - val
+            self.field[indx(_i, _j)] = -val
             newval = 0.
             c = 0.
             for k in range(2, -1, -1):
@@ -238,16 +241,24 @@ class KalmanWrapper(SkelKalmanWrapper):
     """
         This class is use around the simulation to apply the kalman filter
     """
+
     def __init__(self, _reality, _sim):
         SkelKalmanWrapper.__init__(self, _reality, _sim)
         self.size = self.kalsim.size
         _M = self.getwindow()  # Observation matrix.
         self.kalman = KalmanFilter(self.kalsim, _M)
-        self.kalman.S = np.eye(self.kalman.size_s) * self.reality.noiselevel ** 2   # Initial covariance estimate.
-        self.kalman.R = np.eye(self.kalman.size_o) * self.reality.noiselevel ** 2   # Estimated error in measurements.
-
         indx = self.kalsim.grid.indx
-        G = np.zeros([self.kalman.size_s, 1])
+
+        # Initial covariance estimate.
+        self.kalman.S = np.eye(self.kalman.size_s) * \
+            self.reality.noiselevel ** 2
+
+        # Estimated error in measurements.
+        self.kalman.R = np.eye(self.kalman.size_o) * \
+            self.reality.noiselevel ** 2
+
+        # Estimated error in process.
+        # G = np.zeros([self.kalman.size_s, 1])
         # for i in range(self.kalsim.grid.nx):
         #     for j in range(self.kalsim.grid.ny):
         #         G[indx(i, j)] = self.kalsim.grid.dx ** 4 / 24. \
@@ -255,8 +266,10 @@ class KalmanWrapper(SkelKalmanWrapper):
         #                       + self.kalsim.dt ** 2 / 2.
         #         # G[indx(i, j)] = self.kalsim.dt
         #
-        # self.kalman.Q = G.dot(np.transpose(G)) * self.kalsim.noiselevel ** 2  # Estimated error in process.
-        self.kalman.Q = np.eye(self.kalman.size_s) * self.kalsim.noiselevel ** 2  # Estimated error in process.
+        # self.kalman.Q = G.dot(np.transpose(G)) * self.kalsim.noiselevel ** 2
+
+        self.kalman.Q = np.eye(self.kalman.size_s) * \
+            self.kalsim.noiselevel ** 2
         gc_clean()
 
     def getwindow(self):
@@ -291,7 +304,8 @@ class KalmanWrapper(SkelKalmanWrapper):
             Extract the solution from kalman filter : has to reshape it
         :return: current solution
         """
-        return np.reshape(self.kalman.X, [self.kalsim.grid.nx, self.kalsim.grid.ny])
+        return np.reshape(self.kalman.X,
+                          [self.kalsim.grid.nx, self.kalsim.grid.ny])
 
     def setsol(self, field):
         """
@@ -329,7 +343,8 @@ class Chaleur(EDP):
         self.reinit()
         gc_clean()
 
-        print("cfl = ", max([self.dt / (self.grid.dx ** 2), self.dt / (self.grid.dy ** 2)]))
+        print("cfl = ",
+              max([self.dt / (self.grid.dx**2), self.dt / (self.grid.dy**2)]))
         print("dt = ", self.dt)
         print("Norme H1 |  reality |   simu   |  kalman")
 
@@ -396,7 +411,7 @@ class Chaleur(EDP):
         """
         self.reinit()
 
-        # ----------------- Compute reality and measurement --------------------
+        # ----------------- Compute reality and measurement -------------------
         if graphs:
             self.animate(self.reality)
         else:
@@ -410,7 +425,7 @@ class Chaleur(EDP):
         Norm_ref = self.norm(Sol_ref)
         Err_mes = self.norm(Sol_ref - Sol_mes) / Norm_ref
 
-        # ------------------------ Compute simulation without Kalman ----------------------------
+        # ------------------------ Compute simulation without Kalman ----------
         self.reality.reinit()
         # Initial solution
         self.simulation.setsol(self.reality.getsolwithnoise())
@@ -422,7 +437,7 @@ class Chaleur(EDP):
         Sol_sim = self.simulation.getsol()
         Err_sim = self.norm(Sol_ref - Sol_sim) / Norm_ref
 
-        # ------------------------ Compute simulation with Kalman ----------------------------
+        # ------------------------ Compute simulation with Kalman -------------
         self.reality.reinit()
         # Initial solution
         self.kalman.setsol(self.reality.getsolwithnoise())
@@ -437,12 +452,14 @@ class Chaleur(EDP):
 
         # ------------------------ Final output ----------------------------
 
-        print("%8.2e | %8.2e | %8.2e | %8.2e" % (Norm_ref, Err_mes, Err_sim, Err_kal))
+        print("%8.2e | %8.2e | %8.2e | %8.2e" %
+              (Norm_ref, Err_mes, Err_sim, Err_kal))
         Norm_ref = self.grid.norm_inf(Sol_ref)
         Err_mes = self.grid.norm_inf(Sol_mes)
         Err_sim = self.grid.norm_inf(Sol_sim)
         Err_kal = self.grid.norm_inf(Sol_kal)
-        print("%8.2e | %8.2e | %8.2e | %8.2e" % (Norm_ref, Err_mes, Err_sim, Err_kal))
+        print("%8.2e | %8.2e | %8.2e | %8.2e" %
+              (Norm_ref, Err_mes, Err_sim, Err_kal))
 
 
 if __name__ == "__main__":
