@@ -423,10 +423,30 @@ implicit none
   double precision,parameter :: TWOPI = 2.*acos(-1.)
   double precision,allocatable :: x2pi(:),g2rad(:)
   logical,save :: init = .false.
-  integer,parameter :: myseed = 86456
-  integer :: m,i
+!  integer,parameter :: myseed = 86456
+  integer :: m,i, un, istat, pid
+  integer :: myseed
+
 
   if(.not.init) then
+    ! First try if the OS provides a random number generator
+    open(newunit=un, file="/dev/urandom", access="stream", &
+         form="unformatted", action="read", status="old", iostat=istat)
+    if (istat == 0) then
+       read(un) myseed
+       close(un)
+    else
+       ! Fallback to XOR:ing the current time and pid. The PID is
+       ! useful in case one launches multiple instances of the same
+       ! program in parallel.
+       call system_clock(myseed)
+       if (myseed == 0) myseed = 86456
+       pid = getpid()
+       myseed = ieor(myseed, int(pid, kind(myseed)))
+    end if
+  
+!  myseed = 86456
+  
      call srand(myseed)
      init = .true.
   endif

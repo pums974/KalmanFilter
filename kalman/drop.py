@@ -166,16 +166,23 @@ class KalmanWrapper(SkelKalmanWrapper):
                                   [0., 0., _sim.dt ** 2, 0.],
                                   [0., 0., 0., _sim.dt ** 2]]) * _sim.noiselevel ** 2
 
+        # self.kalman.Q = gauss_f(self.kalman.Q.flat,
+        #                         self.kalman.Q[1, 1]/100).reshape(self.kalman.Q.shape)
+        # self.kalman.Q = (self.kalman.Q + self.kalman.Q.transpose()) * 0.5
+
+        self.Q_acc = self.kalman.Q * 0.
+        self.n_acc = 0
+
     def getwindow(self):
         """
         Produce the observation matrix : designate what we conserve of the noisy field.
 
         :return: observation matrix
         """
-        M = np.array([[1, 0, 0, 0],
-                      [0, 0, 1, 0]])
+        # M = np.array([[1, 0, 0, 0],
+        #               [0, 0, 1, 0]])
 
-        # M = np.eye(self.kalsim.size)
+        M = np.eye(self.kalsim.size)
         return M
 
     def setmes(self, field):
@@ -203,6 +210,64 @@ class KalmanWrapper(SkelKalmanWrapper):
         self.kalman.X = field
         self.kalsim.setsol(field)
 
+    def step(self):
+        """
+            Compute the next step of the simulation and apply kalman filter to the result
+        """
+        self.kalsim.step()
+        self.setmes(self.reality.getsolwithnoise())
+
+        S = self.kalman.S
+        Q = self.kalman.Q
+        ref = self.reality.getsol()
+        err1 = 10000
+        Q1 = Q
+        S1 = S
+        for it in range(100):
+            self.setsol(self.kalsim.getsol())
+            self.kalman.S = S
+            self.kalman.apply()
+            err = np.sqrt(np.sum(np.square(ref - self.getsol())))
+            if err < err1:
+                Q1 = self.kalman.Q
+                S1 = self.kalman.S
+                err1 = err
+            self.kalman.Q = gauss_f(Q.flat, Q[1, 1]/10).reshape(Q.shape)
+            self.kalman.Q = np.abs(self.kalman.Q)
+            # self.kalman.Q = np.abs((self.kalman.Q + self.kalman.Q.transpose()) * 0.5)
+
+        self.n_acc += 1
+        self.Q_acc += Q1
+        # print(np.max((self.Q_acc - Q1)/(self.Q_acc*self.n_acc)))
+        self.kalman.Q = Q1
+        self.kalman.S = S1
+
+        # S = self.kalman.S
+        # Q = self.kalman.Q
+        # for i in shape(Q)[0]:
+        #     for j in shape(Q)[1]:
+        #         self.setsol(self.kalsim.getsol())
+        #         self.kalman.S = S
+        #         self.kalman.apply()
+        #     err = np.sqrt(np.sum(np.square(ref - self.getsol())))
+        #     if err < err1:
+        #         Q1 = self.kalman.Q
+        #         S1 = self.kalman.S
+        #         err1 = err
+        #     self.kalman.Q = gauss_f(Q.flat, Q[1, 1]/100).reshape(Q.shape)
+        #     self.kalman.Q = (self.kalman.Q + self.kalman.Q.transpose()) * 0.5
+        #
+        # self.n_acc += 1
+        # self.Q_acc += Q1
+        # # print(np.max((self.Q_acc - Q1)/(self.Q_acc*self.n_acc)))
+        # self.kalman.Q = Q1
+        # self.kalman.S = S1
+        #
+        self.setsol(self.kalsim.getsol())
+        self.kalman.apply()
+        self.kalsim.setsol(self.getsol())
+        self.It = self.kalsim.It
+
 
 class Drop(EDP):
     """
@@ -215,11 +280,11 @@ class Drop(EDP):
     * how to plot the results
     """
 
-    Tfin = 15.
-    nIt = 300
+    # Tfin = 15.
+    nIt = 1000
     noise_real = 20
     noise_sim = 10
-    dt = Tfin / nIt
+    dt = 0.05
     name = "Drop"
 
     def __init__(self):
@@ -228,6 +293,7 @@ class Drop(EDP):
         print("Norme L2 |  mesure  |   simu   |  kalman")
 
         self.reinit()
+        self.Q = self.kalman.kalman.Q
 
     def reinit(self):
         """Reinit everything."""
@@ -242,6 +308,8 @@ class Drop(EDP):
         self.reality.nIt = self.nIt
 
         self.kalman = KalmanWrapper(self.reality, self.kalsim)
+
+        self.Q = self.kalman.kalman.Q
 
     @staticmethod
     def plot(field):
@@ -326,9 +394,32 @@ class Drop(EDP):
 
         print("%8.2e | %8.2e | %8.2e | %8.2e" %
               (Norm_ref, Err_mes, Err_sim, Err_kal))
+
+        # Q = self.kalman.Q_acc / self.kalman.n_acc
+        # print(Q, self.kalman.n_acc)
+        # print(np.sum(Q, axis=1))
+        # print(self.kalman.kalman.Q)
+
         if graphs:
             self.plotall(Sol_ref, Sol_mes, Sol_sim, Sol_kal)
 
+        return Err_kal
 
 if __name__ == "__main__":
-    Drop().run_test_case(False)
+    edp = Drop()
+    # err1 = edp.run_test_case(True)
+
+    # Q_acc = edp.Q * 0.
+    # n_acc = 0
+    # err = 1000
+    for it in range(100000):
+        err1 = edp.run_test_case(False)
+    #     if err1 < err:
+    #         Q_acc += edp.Q
+    #         n_acc += 1
+    #         err = err1
+    #         # print(err)
+    #         print(Q_acc / n_acc)
+        edp.reinit()
+    #     # Q_acc = edp.Q * 0.
+    #     # n_acc = 0
