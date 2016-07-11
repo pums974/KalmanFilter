@@ -22,21 +22,24 @@ try:
     from kalman.kalman import KalmanFilter
     from kalman.skeleton import *
     if sys.version_info < (3, ):
-        from kalman.libs.fortran_libs_py2 import gauss_f
+        from kalman.libs.fortran_libs_py2 import gauss_f, gauss_f2, noisy_q, norm_l2
     else:
-        from kalman.libs.fortran_libs_py3 import gauss_f
+        from kalman.libs.fortran_libs_py3 import gauss_f, gauss_f2, noisy_q, norm_l2
 except:
     from kalman import KalmanFilter
     from skeleton import *
     if sys.version_info < (3, ):
-        from libs.fortran_libs_py2 import gauss_f
+        from libs.fortran_libs_py2 import gauss_f, gauss_f2, noisy_q, norm_l2
     else:
-        from libs.fortran_libs_py3 import gauss_f
+        from libs.fortran_libs_py3 import gauss_f, gauss_f2, noisy_q, norm_l2
 
 use_fortran = True
 
 if sys.version_info < (3, ):
     range = xrange
+
+
+time_it = 0
 
 
 class Reality(SkelReality):
@@ -161,17 +164,35 @@ class KalmanWrapper(SkelKalmanWrapper):
         #               [_sim.dt**2 * 0.5]])
         # self.kalman.Q = G.dot(np.transpose(G)) * self.kalnoise ** 2
         # self.kalman.Q = np.eye(self.kalman.size_s) * self.kalnoise ** 2
-        self.kalman.Q = np.array([[_sim.dt ** 2, 0., 0., 0.],
-                                  [0., _sim.dt ** 2, 0., 0.],
-                                  [0., 0., _sim.dt ** 2, 0.],
-                                  [0., 0., 0., _sim.dt ** 2]]) * _sim.noiselevel ** 2
+        # noise1 = (_sim.dt * _sim.noiselevel) ** 2
+        # noise2 = 0.
+        # noise3 = noise1 / 4.
+        # noise4 = 0.
+        # noise5 = 0.
+        # noise6 = 0.
+        # self.kalman.Q = np.array([[noise1, noise2, noise3, noise4],
+        #                           [noise2, noise1, noise5, noise6],
+        #                           [noise3, noise5, noise1, noise2],
+        #                           [noise4, noise6, noise2, noise1]])
 
+        # print(self.kalman.Q)
+
+        # randomize
         # self.kalman.Q = gauss_f(self.kalman.Q.flat,
         #                         self.kalman.Q[1, 1]/100).reshape(self.kalman.Q.shape)
+        # self.kalman.Q = np.random.random(16).reshape(self.kalman.Q.shape)
+        # self.kalman.Q *= (_sim.dt ** 2 * _sim.noiselevel ** 2) / 2.
+        # self.kalman.Q += np.eye(self.kalman.size_s) * (_sim.dt ** 2 * _sim.noiselevel ** 2) / 2.
+        # # enforce positivity
+        # self.kalman.Q = np.abs(self.kalman.Q)
+        # # enforce symmetricity
         # self.kalman.Q = (self.kalman.Q + self.kalman.Q.transpose()) * 0.5
 
         self.Q_acc = self.kalman.Q * 0.
         self.n_acc = 0
+
+        self.mystep = SkelKalmanWrapper.step
+        # self.mystep = self.randstep
 
     def getwindow(self):
         """
@@ -199,7 +220,7 @@ class KalmanWrapper(SkelKalmanWrapper):
 
         Its dim goes from (n,1) to (n)
         """
-        return self.kalman.X.flatten()
+        return self.kalman.X #.flatten()
 
     def setsol(self, field):
         """
@@ -214,59 +235,95 @@ class KalmanWrapper(SkelKalmanWrapper):
         """
             Compute the next step of the simulation and apply kalman filter to the result
         """
+        self.mystep(self)
+
+    @staticmethod
+    def randstep(self):
+        global time_it
+
         self.kalsim.step()
         self.setmes(self.reality.getsolwithnoise())
 
-        S = self.kalman.S
-        Q = self.kalman.Q
+        old_S = self.kalman.S.copy()
+        old_Q = self.kalman.Q.copy()
+        old_X = self.kalsim.getsol()
         ref = self.reality.getsol()
-        err1 = 10000
-        Q1 = Q
-        S1 = S
-        for it in range(100):
-            self.setsol(self.kalsim.getsol())
-            self.kalman.S = S
+
+        # Try ref Q
+        mid_val = (self.kalsim.dt ** 2 * self.kalsim.noiselevel ** 2)
+        # for j in range(old_Q.shape[1]):
+        #     for i in range(old_Q.shape[0]):
+        #         if i == j:
+        #             self.kalman.Q[i, j] = mid_val
+        #         else:
+        #             self.kalman.Q[i, j] = 0.
+        self.kalman.Q = noisy_q(0, old_Q, mid_val)
+
+        self.kalman.X = old_X.copy()
+        self.kalman.S = old_S.copy()
+        self.kalman.apply()
+        # err = np.sum(np.square(ref - self.kalman.X))
+        err = norm_l2(ref, self.kalman.X)
+        best_Q = self.kalman.Q.copy()
+        err1 = err
+        step = 0
+
+        # Try around ref Q
+        for it in range(1000):
+            # for j in range(old_Q.shape[1]):
+            #     for i in range(old_Q.shape[0]):
+            #         if i == j:
+            #             self.kalman.Q[i, j] = mid_val * 0.5 + np.random.random() * mid_val
+            #         else:
+            #             self.kalman.Q[i, j] = np.random.random() * mid_val * 0.5
+            # # enforce symmetry
+            # self.kalman.Q = (self.kalman.Q + self.kalman.Q.transpose()) * 0.5
+            self.kalman.Q = noisy_q(1, old_Q, mid_val)
+
+            self.kalman.X = old_X.copy()
+            self.kalman.S = old_S.copy()
             self.kalman.apply()
-            err = np.sqrt(np.sum(np.square(ref - self.getsol())))
+            # err = np.sum(np.square(ref - self.kalman.X))
+            err = norm_l2(ref, self.kalman.X)
             if err < err1:
-                Q1 = self.kalman.Q
-                S1 = self.kalman.S
+                best_Q = self.kalman.Q.copy()
                 err1 = err
-            self.kalman.Q = gauss_f(Q.flat, Q[1, 1]/10).reshape(Q.shape)
-            self.kalman.Q = np.abs(self.kalman.Q)
-            # self.kalman.Q = np.abs((self.kalman.Q + self.kalman.Q.transpose()) * 0.5)
+                step = 1
 
-        self.n_acc += 1
-        self.Q_acc += Q1
+        # Try around old_Q
+        for it in range(1000):
+            # for j in range(old_Q.shape[1]):
+            #     for i in range(old_Q.shape[0]):
+            #         self.kalman.Q[i, j] = old_Q[i, j] * 0.5 + np.random.random() * old_Q[i, j]
+            # # enforce symmetry
+            # self.kalman.Q = (self.kalman.Q + self.kalman.Q.transpose()) * 0.5
+            self.kalman.Q = noisy_q(2, old_Q, mid_val)
+
+            self.kalman.X = old_X.copy()
+            self.kalman.S = old_S.copy()
+            self.kalman.apply()
+            # err = np.sum(np.square(ref - self.kalman.X))
+            err = norm_l2(ref, self.kalman.X)
+            if err < err1:
+                best_Q = self.kalman.Q.copy()
+                err1 = err
+                step = 2
+
         # print(np.max((self.Q_acc - Q1)/(self.Q_acc*self.n_acc)))
-        self.kalman.Q = Q1
-        self.kalman.S = S1
+        self.kalman.Q = best_Q.copy()
+        self.kalman.X = old_X.copy()
+        self.kalman.S = old_S.copy()
+        self.Q_acc += self.kalman.Q
+        self.n_acc += 1
 
-        # S = self.kalman.S
-        # Q = self.kalman.Q
-        # for i in shape(Q)[0]:
-        #     for j in shape(Q)[1]:
-        #         self.setsol(self.kalsim.getsol())
-        #         self.kalman.S = S
-        #         self.kalman.apply()
-        #     err = np.sqrt(np.sum(np.square(ref - self.getsol())))
-        #     if err < err1:
-        #         Q1 = self.kalman.Q
-        #         S1 = self.kalman.S
-        #         err1 = err
-        #     self.kalman.Q = gauss_f(Q.flat, Q[1, 1]/100).reshape(Q.shape)
-        #     self.kalman.Q = (self.kalman.Q + self.kalman.Q.transpose()) * 0.5
-        #
-        # self.n_acc += 1
-        # self.Q_acc += Q1
-        # # print(np.max((self.Q_acc - Q1)/(self.Q_acc*self.n_acc)))
-        # self.kalman.Q = Q1
-        # self.kalman.S = S1
-        #
-        self.setsol(self.kalsim.getsol())
         self.kalman.apply()
         self.kalsim.setsol(self.getsol())
         self.It = self.kalsim.It
+
+        # self.kalman.Q = old_Q.copy()
+        time_it += 1
+        # print(self.Q_acc/self.n_acc, self.n_acc)
+        # print(step)
 
 
 class Drop(EDP):
@@ -281,22 +338,26 @@ class Drop(EDP):
     """
 
     # Tfin = 15.
-    nIt = 1000
+    nIt = 300
     noise_real = 20
     noise_sim = 10
-    dt = 0.05
+    dt = 0.5
     name = "Drop"
 
     def __init__(self):
         """Initilisation."""
         EDP.__init__(self)
-        print("Norme L2 |  mesure  |   simu   |  kalman")
+        # print("Norme L2 |  mesure  |   simu   |  kalman")
 
         self.reinit()
-        self.Q = self.kalman.kalman.Q
+        # self.Q = self.kalman.kalman.Q
 
     def reinit(self):
         """Reinit everything."""
+
+        _ = gauss_f([0], 0)
+        _ = gauss_f2(1)
+
         self.simulation = Simulation(self.dt, self.noise_sim)
         self.kalsim = Simulation(self.dt, self.noise_sim)
 
@@ -309,7 +370,7 @@ class Drop(EDP):
 
         self.kalman = KalmanWrapper(self.reality, self.kalsim)
 
-        self.Q = self.kalman.kalman.Q
+        # self.Q = self.kalman.kalman.Q
 
     @staticmethod
     def plot(field):
@@ -354,7 +415,7 @@ class Drop(EDP):
 
     def run_test_case(self, graphs):
         """Run the test case."""
-        self.reinit()
+        # self.reinit()
 
         Sol_ref = np.zeros([self.nIt, 4])
         Sol_mes = np.zeros([self.nIt, 4])
@@ -395,31 +456,108 @@ class Drop(EDP):
         print("%8.2e | %8.2e | %8.2e | %8.2e" %
               (Norm_ref, Err_mes, Err_sim, Err_kal))
 
-        # Q = self.kalman.Q_acc / self.kalman.n_acc
+        # self.Q = self.kalman.Q_acc / self.kalman.n_acc
         # print(Q, self.kalman.n_acc)
         # print(np.sum(Q, axis=1))
-        # print(self.kalman.kalman.Q)
+        # print(self.kalman.kalman.Q, 2)
 
         if graphs:
             self.plotall(Sol_ref, Sol_mes, Sol_sim, Sol_kal)
 
         return Err_kal
 
-if __name__ == "__main__":
-    edp = Drop()
-    # err1 = edp.run_test_case(True)
 
-    # Q_acc = edp.Q * 0.
-    # n_acc = 0
+def try_noisy_q(edp):
+
+    list_noise_real = [0.05, 0.1, 0.2, 20]
+    list_noise_sim  = [0.05, 0.1, 0.2, 10]
+    list_dt = [0.05, 0.1, 0.2]
+
+    # list_noise_real = [0.05]
+    # list_noise_sim  = [0.05]
+    # list_dt = [0.05]
+
+    for nr in list_noise_real:
+        for ns in list_noise_sim:
+            for dt in list_dt:
+                edp.noise_real = nr
+                edp.noise_sim = ns
+                edp.dt = dt
+                time_it = 0
+
+                edp.reinit()
+
+                noise1 = (edp.dt * edp.noise_sim) ** 2
+                noise2 = 0.
+                noise3 = 0.
+                noise4 = 0.
+                noise5 = 0.
+                noise6 = 0.
+                edp.kalman.kalman.Q = np.array([[noise1, noise2, noise3, noise4],
+                                                [noise2, noise1, noise5, noise6],
+                                                [noise3, noise5, noise1, noise2],
+                                                [noise4, noise6, noise2, noise1]])
+                print("noise_real      = ", nr)
+                print("noise_sim       = ", ns)
+                print("time step       = ", dt)
+                print("number of steps = ", edp.nIt)
+                print("(dt+ns)**2      = ", noise1)
+                print("run without random Q (Q = Id * (dt+ns)**2)")
+                print("Norme L2 |  mesure  |   simu   |  kalman")
+                err1 = edp.run_test_case(False)
+                # print(edp.kalman.kalman.Q)
+
+                # edp.reinit()
+                #
+                # noise1 = (edp.dt * edp.noise_sim) ** 2
+                # noise2 = noise1 / 4.
+                # noise3 = noise1 / 4.
+                # noise4 = noise1 / 4.
+                # noise5 = noise1 / 4.
+                # noise6 = noise1 / 4.
+                # edp.kalman.kalman.Q = np.array([[noise1, noise2, noise3, noise4],
+                #                                 [noise2, noise1, noise5, noise6],
+                #                                 [noise3, noise5, noise1, noise2],
+                #                                 [noise4, noise6, noise2, noise1]])
+                # err1 = edp.run_test_case(False)
+                # print(edp.kalman.kalman.Q)
+
+                edp.reinit()
+                noise1 = (edp.dt * edp.noise_sim) ** 2
+                noise2 = 0.
+                noise3 = 0.
+                noise4 = 0.
+                noise5 = 0.
+                noise6 = 0.
+                edp.kalman.kalman.Q = np.array([[noise1, noise2, noise3, noise4],
+                                                [noise2, noise1, noise5, noise6],
+                                                [noise3, noise5, noise1, noise2],
+                                                [noise4, noise6, noise2, noise1]])
+                edp.kalman.mystep = edp.kalman.randstep
+                print("run with random Q (2000 rand Q is tried at each time step)")
+                print("Norme L2 |  mesure  |   simu   |  kalman")
+                err1 = edp.run_test_case(False)
+                print("normalized average Q obtained")
+                print(edp.kalman.Q_acc/edp.kalman.n_acc/noise1)
+
+    # Q_acc = edp.Q
+    # n_acc = 1
     # err = 1000
-    for it in range(100000):
-        err1 = edp.run_test_case(False)
+    # print(edp.Q / n_acc)
+    # for it in range(100000):
+    #     err1 = edp.run_test_case(False)
     #     if err1 < err:
     #         Q_acc += edp.Q
     #         n_acc += 1
     #         err = err1
     #         # print(err)
     #         print(Q_acc / n_acc)
-        edp.reinit()
+    #     edp.reinit()
+    #     edp.kalman.kalman.Q = Q_acc / n_acc
     #     # Q_acc = edp.Q * 0.
     #     # n_acc = 0
+
+
+if __name__ == "__main__":
+    edp = Drop()
+    try_noisy_q(edp)

@@ -1,0 +1,773 @@
+/usr/bin/python2.7 /home/alex/WORK-local/Projets/SRC/Kalman/runner.py
+noise_real      =  0.05
+noise_sim       =  0.05
+time step       =  0.05
+number of steps =  300
+(dt+ns)**2      =  6.25e-06
+run without random Q (Q = Id * (dt+ns)**2)
+Norme L2 |  mesure  |   simu   |  kalman
+1.11e+04 | 1.52e-04 | 6.81e-03 | 1.82e-03
+run with random Q (2000 rand Q is tried at each time step)
+Norme L2 |  mesure  |   simu   |  kalman
+1.11e+04 | 1.52e-04 | 6.81e-03 | 1.16e-03
+average Q obtained
+[[  7.35698755e-05   1.43627311e-06   2.45613067e-06   1.86744895e-06]
+ [  1.49516349e-06   7.70223753e-06   1.63804437e-06   1.62380146e-06]
+ [  1.30828468e-05   1.42461855e-06   4.80463333e-05   1.56210475e-06]
+ [  1.46761368e-06   1.48380008e-06   1.48354392e-06   1.75055327e-05]]
+noise_real      =  0.05
+noise_sim       =  0.05
+time step       =  0.1
+number of steps =  300
+(dt+ns)**2      =  2.5e-05
+run without random Q (Q = Id * (dt+ns)**2)
+Norme L2 |  mesure  |   simu   |  kalman
+2.58e+04 | 6.56e-05 | 9.68e-03 | 1.08e-03
+run with random Q (2000 rand Q is tried at each time step)
+Norme L2 |  mesure  |   simu   |  kalman
+2.58e+04 | 6.56e-05 | 9.68e-03 | 7.74e-04
+average Q obtained
+[[  6.85897664e-05   6.16004234e-06   9.21459371e-06   6.45685555e-06]
+ [  6.32560513e-06   3.46009101e-05   6.90804186e-06   6.51893743e-06]
+ [  3.12482626e-05   5.38292381e-06   6.55305399e-05   6.43317642e-06]
+ [  5.85801078e-06   6.28001191e-06   6.13162037e-06   6.24778918e-05]]
+noise_real      =  0.05
+noise_sim       =  0.05
+time step       =  0.2
+number of steps =  300
+(dt+ns)**2      =  0.0001
+run without random Q (Q = Id * (dt+ns)**2)
+Norme L2 |  mesure  |   simu   |  kalman
+1.05e+05 | 1.61e-05 | 1.01e-02 | 3.55e-04
+run with random Q (2000 rand Q is tried at each time step)
+Norme L2 |  mesure  |   simu   |  kalman
+1.05e+05 | 1.61e-05 | 1.01e-02 | 2.71e-04
+average Q obtained
+[[  1.50034147e-04   2.42894993e-05   2.92325142e-05   2.70025149e-05]
+ [  2.47842575e-05   1.11532543e-04   2.45446403e-05   2.38243111e-05]
+ [  3.52642971e-05   2.29386295e-05   1.44785145e-04   2.53755789e-05]
+ [  2.37573652e-05   2.44530078e-05   2.61633472e-05   1.78509561e-04]]
+noise_real      =  0.05
+noise_sim       =  0.1
+time step       =  0.05
+number of steps =  300
+(dt+ns)**2      =  2.5e-05
+run without random Q (Q = Id * (dt+ns)**2)
+Norme L2 |  mesure  |   simu   |  kalman
+1.11e+04 | 1.52e-04 | 7.20e-03 | 1.31e-03
+run with random Q (2000 rand Q is tried at each time step)
+Norme L2 |  mesure  |   simu   |  kalman
+1.11e+04 | 1.52e-04 | 7.20e-03 | 9.11e-04
+average Q obtained
+[[  6.30654486e-05   5.79768971e-06   7.42032580e-06   6.51002451e-06]
+ [  6.36604688e-06   2.81460001e-05   6.69270839e-06   6.60389123e-06]
+ [  1.78804344e-05   5.29307804e-06   6.49164399e-05   6.64996469e-06]
+ [  6.06915081e-06   6.27227446e-06   6.05864443e-06   3.68667968e-05]]
+noise_real      =  0.05
+noise_sim       =  0.1
+time step       =  0.1
+number of steps =  300
+(dt+ns)**2      =  0.0001
+run without random Q (Q = Id * (dt+ns)**2)
+Norme L2 |  mesure  |   simu   |  kalman
+2.58e+04 | 6.56e-05 | 1.04e-02 | 7.58e-04
+run with random Q (2000 rand Q is tried at each time step)
+Norme L2 |  mesure  |   simu   |  kalman
+2.58e+04 | 6.56e-05 | 1.04e-02 | 5.65e-04
+average Q obtained
+[[  1.33037190e-04   2.16038429e-05   2.71781137e-05   2.41157145e-05]
+ [  2.48400913e-05   9.96924741e-05   2.53654197e-05   2.48954404e-05]
+ [  3.49157878e-05   2.35288149e-05   1.54482556e-04   2.42662224e-05]
+ [  2.56846932e-05   2.42284976e-05   2.55833594e-05   1.59732581e-04]]
+noise_real      =  0.05
+noise_sim       =  0.1
+time step       =  0.2
+number of steps =  300
+(dt+ns)**2      =  0.0004
+run without random Q (Q = Id * (dt+ns)**2)
+Norme L2 |  mesure  |   simu   |  kalman
+1.05e+05 | 1.61e-05 | 1.07e-02 | 2.34e-04
+run with random Q (2000 rand Q is tried at each time step)
+Norme L2 |  mesure  |   simu   |  kalman
+1.05e+05 | 1.61e-05 | 1.07e-02 | 1.78e-04
+average Q obtained
+[[  3.99910617e-04   9.71981479e-05   1.02898124e-04   9.51229509e-05]
+ [  1.04686318e-04   3.79757535e-04   9.81503983e-05   1.07699779e-04]
+ [  1.12092743e-04   1.02231169e-04   3.79146341e-04   9.56093267e-05]
+ [  9.57085283e-05   1.01658337e-04   9.99598345e-05   4.76365515e-04]]
+noise_real      =  0.05
+noise_sim       =  0.2
+time step       =  0.05
+number of steps =  300
+(dt+ns)**2      =  0.0001
+run without random Q (Q = Id * (dt+ns)**2)
+Norme L2 |  mesure  |   simu   |  kalman
+1.11e+04 | 1.52e-04 | 8.02e-03 | 8.96e-04
+run with random Q (2000 rand Q is tried at each time step)
+Norme L2 |  mesure  |   simu   |  kalman
+1.11e+04 | 1.52e-04 | 8.02e-03 | 6.66e-04
+average Q obtained
+[[  1.23767406e-04   2.20972907e-05   3.10384976e-05   2.60296334e-05]
+ [  2.57798760e-05   9.30466036e-05   2.59369827e-05   2.37541176e-05]
+ [  3.24022254e-05   2.37823644e-05   1.17429219e-04   2.63800439e-05]
+ [  2.53000741e-05   2.43600356e-05   2.35099543e-05   1.38877298e-04]]
+noise_real      =  0.05
+noise_sim       =  0.2
+time step       =  0.1
+number of steps =  300
+(dt+ns)**2      =  0.0004
+run without random Q (Q = Id * (dt+ns)**2)
+Norme L2 |  mesure  |   simu   |  kalman
+2.58e+04 | 6.56e-05 | 1.18e-02 | 4.87e-04
+run with random Q (2000 rand Q is tried at each time step)
+Norme L2 |  mesure  |   simu   |  kalman
+2.58e+04 | 6.56e-05 | 1.18e-02 | 3.70e-04
+average Q obtained
+[[  4.06830269e-04   1.01414535e-04   9.46606036e-05   9.63108221e-05]
+ [  1.01968669e-04   3.65072598e-04   9.70121296e-05   1.04559554e-04]
+ [  1.21640384e-04   1.03472519e-04   3.78943516e-04   9.35708888e-05]
+ [  9.14837560e-05   1.02691677e-04   9.62702123e-05   4.49042367e-04]]
+noise_real      =  0.05
+noise_sim       =  0.2
+time step       =  0.2
+number of steps =  300
+(dt+ns)**2      =  0.0016
+run without random Q (Q = Id * (dt+ns)**2)
+Norme L2 |  mesure  |   simu   |  kalman
+1.05e+05 | 1.61e-05 | 1.19e-02 | 1.31e-04
+run with random Q (2000 rand Q is tried at each time step)
+Norme L2 |  mesure  |   simu   |  kalman
+1.05e+05 | 1.61e-05 | 1.19e-02 | 9.50e-05
+average Q obtained
+[[ 0.00135277  0.00039827  0.00041111  0.00036162]
+ [ 0.00041506  0.00145317  0.00042132  0.00041679]
+ [ 0.00040114  0.00036352  0.00128236  0.0004024 ]
+ [ 0.00038197  0.00038301  0.0003994   0.00165281]]
+noise_real      =  0.05
+noise_sim       =  10
+time step       =  0.05
+number of steps =  300
+(dt+ns)**2      =  0.25
+run without random Q (Q = Id * (dt+ns)**2)
+Norme L2 |  mesure  |   simu   |  kalman
+1.11e+04 | 1.52e-04 | 1.11e-01 | 1.54e-04
+run with random Q (2000 rand Q is tried at each time step)
+Norme L2 |  mesure  |   simu   |  kalman
+1.11e+04 | 1.52e-04 | 1.11e-01 | 1.06e-04
+average Q obtained
+[[ 0.16791335  0.07487692  0.07261713  0.05184217]
+ [ 0.07728071  0.13275105  0.06649173  0.07163953]
+ [ 0.07353123  0.06381989  0.18677262  0.06512391]
+ [ 0.06244634  0.07257864  0.07970512  0.16412962]]
+noise_real      =  0.05
+noise_sim       =  10
+time step       =  0.1
+number of steps =  300
+(dt+ns)**2      =  1.0
+run without random Q (Q = Id * (dt+ns)**2)
+Norme L2 |  mesure  |   simu   |  kalman
+2.58e+04 | 6.56e-05 | 1.88e-01 | 6.67e-05
+run with random Q (2000 rand Q is tried at each time step)
+Norme L2 |  mesure  |   simu   |  kalman
+2.58e+04 | 6.56e-05 | 1.88e-01 | 4.75e-05
+average Q obtained
+[[ 0.557669    0.29065806  0.24158283  0.29010614]
+ [ 0.29506755  0.51817874  0.21584431  0.36256439]
+ [ 0.23696408  0.22491023  0.58595502  0.28466666]
+ [ 0.26455316  0.2522538   0.29434308  0.59810795]]
+noise_real      =  0.05
+noise_sim       =  10
+time step       =  0.2
+number of steps =  300
+(dt+ns)**2      =  4.0
+run without random Q (Q = Id * (dt+ns)**2)
+Norme L2 |  mesure  |   simu   |  kalman
+1.05e+05 | 1.61e-05 | 1.83e-01 | 1.64e-05
+run with random Q (2000 rand Q is tried at each time step)
+Norme L2 |  mesure  |   simu   |  kalman
+1.05e+05 | 1.61e-05 | 1.83e-01 | 1.22e-05
+average Q obtained
+[[ 2.17421525  1.01683975  1.0580762   0.84568134]
+ [ 0.63172827  2.05024463  0.9011411   1.0364306 ]
+ [ 0.77067109  1.07609094  2.82586339  1.31857751]
+ [ 0.68714918  1.4650602   1.00366148  2.25410491]]
+noise_real      =  0.1
+noise_sim       =  0.05
+time step       =  0.05
+number of steps =  300
+(dt+ns)**2      =  6.25e-06
+run without random Q (Q = Id * (dt+ns)**2)
+Norme L2 |  mesure  |   simu   |  kalman
+1.11e+04 | 3.04e-04 | 6.81e-03 | 2.37e-03
+run with random Q (2000 rand Q is tried at each time step)
+Norme L2 |  mesure  |   simu   |  kalman
+1.11e+04 | 3.04e-04 | 6.81e-03 | 1.41e-03
+average Q obtained
+[[  1.07289183e-04   1.53401159e-06   2.67394102e-06   1.78902317e-06]
+ [  1.64284921e-06   6.32815640e-06   1.84216179e-06   1.60426045e-06]
+ [  2.64240797e-05   1.90400103e-06   9.09584523e-05   1.52404907e-06]
+ [  1.42225853e-06   1.76332976e-06   1.49417742e-06   4.69845698e-05]]
+noise_real      =  0.1
+noise_sim       =  0.05
+time step       =  0.1
+number of steps =  300
+(dt+ns)**2      =  2.5e-05
+run without random Q (Q = Id * (dt+ns)**2)
+Norme L2 |  mesure  |   simu   |  kalman
+2.58e+04 | 1.31e-04 | 9.68e-03 | 1.43e-03
+run with random Q (2000 rand Q is tried at each time step)
+Norme L2 |  mesure  |   simu   |  kalman
+2.58e+04 | 1.31e-04 | 9.68e-03 | 9.85e-04
+average Q obtained
+[[  3.24779711e-04   5.93670256e-06   9.09694151e-06   7.13555504e-06]
+ [  5.92683525e-06   2.97077201e-05   6.98486358e-06   6.05118936e-06]
+ [  2.80290675e-05   6.53859055e-06   3.26144275e-04   6.45086221e-06]
+ [  5.98605330e-06   6.62917075e-06   5.64590409e-06   5.47541076e-05]]
+noise_real      =  0.1
+noise_sim       =  0.05
+time step       =  0.2
+number of steps =  300
+(dt+ns)**2      =  0.0001
+run without random Q (Q = Id * (dt+ns)**2)
+Norme L2 |  mesure  |   simu   |  kalman
+1.05e+05 | 3.23e-05 | 1.01e-02 | 4.83e-04
+run with random Q (2000 rand Q is tried at each time step)
+Norme L2 |  mesure  |   simu   |  kalman
+1.05e+05 | 3.23e-05 | 1.01e-02 | 3.69e-04
+average Q obtained
+[[  3.46809848e-04   2.36984350e-05   3.53754149e-05   2.59086132e-05]
+ [  2.79415880e-05   1.49800501e-04   2.67617553e-05   2.57900492e-05]
+ [  4.83013094e-05   2.37114153e-05   4.07057264e-04   2.28061290e-05]
+ [  2.30878127e-05   2.55339334e-05   2.33937616e-05   2.15042289e-04]]
+noise_real      =  0.1
+noise_sim       =  0.1
+time step       =  0.05
+number of steps =  300
+(dt+ns)**2      =  2.5e-05
+run without random Q (Q = Id * (dt+ns)**2)
+Norme L2 |  mesure  |   simu   |  kalman
+1.11e+04 | 3.04e-04 | 7.20e-03 | 1.82e-03
+run with random Q (2000 rand Q is tried at each time step)
+Norme L2 |  mesure  |   simu   |  kalman
+1.11e+04 | 3.04e-04 | 7.20e-03 | 1.16e-03
+average Q obtained
+[[  2.16808056e-04   5.85226753e-06   1.16096581e-05   6.87812042e-06]
+ [  5.74848985e-06   2.79305409e-05   6.73117064e-06   6.29268302e-06]
+ [  5.74563467e-05   5.19448431e-06   2.01323713e-04   6.31026239e-06]
+ [  5.65620819e-06   5.92670621e-06   5.92518718e-06   6.30195938e-05]]
+noise_real      =  0.1
+noise_sim       =  0.1
+time step       =  0.1
+number of steps =  300
+(dt+ns)**2      =  0.0001
+run without random Q (Q = Id * (dt+ns)**2)
+Norme L2 |  mesure  |   simu   |  kalman
+2.58e+04 | 1.31e-04 | 1.04e-02 | 1.08e-03
+run with random Q (2000 rand Q is tried at each time step)
+Norme L2 |  mesure  |   simu   |  kalman
+2.58e+04 | 1.31e-04 | 1.04e-02 | 7.75e-04
+average Q obtained
+[[  2.20124901e-04   2.44271599e-05   3.78005348e-05   2.74993353e-05]
+ [  2.45479982e-05   1.09500786e-04   2.75138376e-05   2.55423599e-05]
+ [  7.06599049e-05   2.18849369e-05   2.32261108e-04   2.56392928e-05]
+ [  2.35597735e-05   2.61348538e-05   2.34063886e-05   1.47499552e-04]]
+noise_real      =  0.1
+noise_sim       =  0.1
+time step       =  0.2
+number of steps =  300
+(dt+ns)**2      =  0.0004
+run without random Q (Q = Id * (dt+ns)**2)
+Norme L2 |  mesure  |   simu   |  kalman
+1.05e+05 | 3.23e-05 | 1.07e-02 | 3.55e-04
+run with random Q (2000 rand Q is tried at each time step)
+Norme L2 |  mesure  |   simu   |  kalman
+1.05e+05 | 3.23e-05 | 1.07e-02 | 2.72e-04
+average Q obtained
+[[  5.59360449e-04   9.72816112e-05   1.11461567e-04   1.04146329e-04]
+ [  9.95641836e-05   4.17241188e-04   9.89096010e-05   9.52568909e-05]
+ [  1.30526566e-04   9.17274160e-05   5.89838368e-04   1.01145853e-04]
+ [  9.48119507e-05   9.91339083e-05   1.06341503e-04   6.37719782e-04]]
+noise_real      =  0.1
+noise_sim       =  0.2
+time step       =  0.05
+number of steps =  300
+(dt+ns)**2      =  0.0001
+run without random Q (Q = Id * (dt+ns)**2)
+Norme L2 |  mesure  |   simu   |  kalman
+1.11e+04 | 3.04e-04 | 8.02e-03 | 1.31e-03
+run with random Q (2000 rand Q is tried at each time step)
+Norme L2 |  mesure  |   simu   |  kalman
+1.11e+04 | 3.04e-04 | 8.02e-03 | 9.16e-04
+average Q obtained
+[[  2.13257910e-04   2.37077573e-05   4.88665560e-05   2.56818891e-05]
+ [  2.56374380e-05   9.93548850e-05   2.64842407e-05   2.64942572e-05]
+ [  6.01099959e-05   2.10352772e-05   1.83425229e-04   2.59292150e-05]
+ [  2.46291243e-05   2.62461180e-05   2.49888236e-05   1.20009195e-04]]
+noise_real      =  0.1
+noise_sim       =  0.2
+time step       =  0.1
+number of steps =  300
+(dt+ns)**2      =  0.0004
+run without random Q (Q = Id * (dt+ns)**2)
+Norme L2 |  mesure  |   simu   |  kalman
+2.58e+04 | 1.31e-04 | 1.18e-02 | 7.59e-04
+run with random Q (2000 rand Q is tried at each time step)
+Norme L2 |  mesure  |   simu   |  kalman
+2.58e+04 | 1.31e-04 | 1.18e-02 | 5.68e-04
+average Q obtained
+[[  4.61009753e-04   8.52761888e-05   1.02304452e-04   9.22922656e-05]
+ [  9.92254808e-05   3.89583072e-04   1.04149848e-04   1.02877604e-04]
+ [  1.27876238e-04   9.85083170e-05   4.81617468e-04   9.92967004e-05]
+ [  1.03309273e-04   9.82358427e-05   1.00494866e-04   5.19527908e-04]]
+noise_real      =  0.1
+noise_sim       =  0.2
+time step       =  0.2
+number of steps =  300
+(dt+ns)**2      =  0.0016
+run without random Q (Q = Id * (dt+ns)**2)
+Norme L2 |  mesure  |   simu   |  kalman
+1.05e+05 | 3.23e-05 | 1.19e-02 | 2.35e-04
+run with random Q (2000 rand Q is tried at each time step)
+Norme L2 |  mesure  |   simu   |  kalman
+1.05e+05 | 3.23e-05 | 1.19e-02 | 1.79e-04
+average Q obtained
+[[ 0.00147433  0.00039161  0.00040577  0.00038229]
+ [ 0.00041831  0.00146977  0.00039301  0.00043508]
+ [ 0.00043085  0.00041294  0.00148586  0.00038523]
+ [ 0.0003909   0.00041288  0.00039555  0.00173439]]
+noise_real      =  0.1
+noise_sim       =  10
+time step       =  0.05
+number of steps =  300
+(dt+ns)**2      =  0.25
+run without random Q (Q = Id * (dt+ns)**2)
+Norme L2 |  mesure  |   simu   |  kalman
+1.11e+04 | 3.04e-04 | 1.11e-01 | 3.02e-04
+run with random Q (2000 rand Q is tried at each time step)
+Norme L2 |  mesure  |   simu   |  kalman
+1.11e+04 | 3.04e-04 | 1.11e-01 | 2.08e-04
+average Q obtained
+[[ 0.16997375  0.0745145   0.07135165  0.06322859]
+ [ 0.06728009  0.17450418  0.0774012   0.06350554]
+ [ 0.06788267  0.06618011  0.17289215  0.06303304]
+ [ 0.06911904  0.08382872  0.06818275  0.16967192]]
+noise_real      =  0.1
+noise_sim       =  10
+time step       =  0.1
+number of steps =  300
+(dt+ns)**2      =  1.0
+run without random Q (Q = Id * (dt+ns)**2)
+Norme L2 |  mesure  |   simu   |  kalman
+2.58e+04 | 1.31e-04 | 1.88e-01 | 1.33e-04
+run with random Q (2000 rand Q is tried at each time step)
+Norme L2 |  mesure  |   simu   |  kalman
+2.58e+04 | 1.31e-04 | 1.88e-01 | 9.17e-05
+average Q obtained
+[[ 0.60942599  0.27572904  0.28048547  0.21811525]
+ [ 0.28980712  0.56096724  0.27165056  0.26309281]
+ [ 0.29830865  0.20561323  0.7040785   0.27244051]
+ [ 0.24628365  0.28906934  0.29350126  0.62968291]]
+noise_real      =  0.1
+noise_sim       =  10
+time step       =  0.2
+number of steps =  300
+(dt+ns)**2      =  4.0
+run without random Q (Q = Id * (dt+ns)**2)
+Norme L2 |  mesure  |   simu   |  kalman
+1.05e+05 | 3.23e-05 | 1.83e-01 | 3.28e-05
+run with random Q (2000 rand Q is tried at each time step)
+Norme L2 |  mesure  |   simu   |  kalman
+1.05e+05 | 3.23e-05 | 1.83e-01 | 2.28e-05
+average Q obtained
+[[ 2.13347051  1.2105061   1.05726309  1.13862607]
+ [ 1.2327708   2.40006499  0.91172788  1.16877613]
+ [ 0.82027921  0.81451654  2.64970914  1.04326828]
+ [ 0.99496861  1.02374221  1.22766735  2.23570088]]
+noise_real      =  0.2
+noise_sim       =  0.05
+time step       =  0.05
+number of steps =  300
+(dt+ns)**2      =  6.25e-06
+run without random Q (Q = Id * (dt+ns)**2)
+Norme L2 |  mesure  |   simu   |  kalman
+1.11e+04 | 6.08e-04 | 6.81e-03 | 2.94e-03
+run with random Q (2000 rand Q is tried at each time step)
+Norme L2 |  mesure  |   simu   |  kalman
+1.11e+04 | 6.08e-04 | 6.81e-03 | 1.63e-03
+average Q obtained
+[[  1.62438007e-04   1.63500682e-06   4.95992645e-06   1.61288858e-06]
+ [  1.54608570e-06   5.44377341e-06   1.54853469e-06   2.98539294e-06]
+ [  2.04119490e-05   1.50100555e-06   1.77709269e-04   1.58818532e-06]
+ [  1.33900666e-06   1.54709432e-06   1.48206995e-06   9.64738566e-05]]
+noise_real      =  0.2
+noise_sim       =  0.05
+time step       =  0.1
+number of steps =  300
+(dt+ns)**2      =  2.5e-05
+run without random Q (Q = Id * (dt+ns)**2)
+Norme L2 |  mesure  |   simu   |  kalman
+2.58e+04 | 2.62e-04 | 9.68e-03 | 1.77e-03
+run with random Q (2000 rand Q is tried at each time step)
+Norme L2 |  mesure  |   simu   |  kalman
+2.58e+04 | 2.62e-04 | 9.68e-03 | 1.19e-03
+average Q obtained
+[[  3.81477823e-04   6.71833013e-06   1.03137736e-05   6.69587589e-06]
+ [  6.15036238e-06   2.48837111e-05   5.80897495e-06   1.73110625e-05]
+ [  7.07686355e-05   5.46685028e-06   2.51641574e-04   6.29238341e-06]
+ [  5.15427284e-06   8.15525186e-06   5.89009334e-06   1.82895593e-04]]
+noise_real      =  0.2
+noise_sim       =  0.05
+time step       =  0.2
+number of steps =  300
+(dt+ns)**2      =  0.0001
+run without random Q (Q = Id * (dt+ns)**2)
+Norme L2 |  mesure  |   simu   |  kalman
+1.05e+05 | 6.45e-05 | 1.01e-02 | 6.08e-04
+run with random Q (2000 rand Q is tried at each time step)
+Norme L2 |  mesure  |   simu   |  kalman
+1.05e+05 | 6.45e-05 | 1.01e-02 | 4.68e-04
+average Q obtained
+[[  1.27146242e-03   2.56696959e-05   3.72259389e-05   2.64368643e-05]
+ [  2.49385096e-05   1.54140945e-04   2.32233002e-05   2.85806007e-05]
+ [  1.13451923e-04   2.19441115e-05   1.52030713e-03   2.48393992e-05]
+ [  2.06445265e-05   2.35443108e-05   1.10773650e-04   2.95134579e-04]]
+noise_real      =  0.2
+noise_sim       =  0.1
+time step       =  0.05
+number of steps =  300
+(dt+ns)**2      =  2.5e-05
+run without random Q (Q = Id * (dt+ns)**2)
+Norme L2 |  mesure  |   simu   |  kalman
+1.11e+04 | 6.08e-04 | 7.20e-03 | 2.37e-03
+run with random Q (2000 rand Q is tried at each time step)
+Norme L2 |  mesure  |   simu   |  kalman
+1.11e+04 | 6.08e-04 | 7.20e-03 | 1.41e-03
+average Q obtained
+[[  2.98546726e-04   6.28492094e-06   1.91986123e-05   7.28783995e-06]
+ [  6.34023555e-06   2.66069496e-05   6.84451453e-06   6.45305874e-06]
+ [  6.87386859e-05   5.95931902e-06   2.26104060e-04   5.99891188e-06]
+ [  6.00059291e-06   6.51208850e-06   5.66542093e-06   6.36125534e-05]]
+noise_real      =  0.2
+noise_sim       =  0.1
+time step       =  0.1
+number of steps =  300
+(dt+ns)**2      =  0.0001
+run without random Q (Q = Id * (dt+ns)**2)
+Norme L2 |  mesure  |   simu   |  kalman
+2.58e+04 | 2.62e-04 | 1.04e-02 | 1.43e-03
+run with random Q (2000 rand Q is tried at each time step)
+Norme L2 |  mesure  |   simu   |  kalman
+2.58e+04 | 2.62e-04 | 1.04e-02 | 9.87e-04
+average Q obtained
+[[  8.64240266e-04   2.49918794e-05   3.91822459e-05   2.80672913e-05]
+ [  2.54195079e-05   1.09397601e-04   2.93719054e-05   2.38890746e-05]
+ [  1.46137022e-04   2.56000930e-05   1.13047678e-03   2.54551492e-05]
+ [  2.32858734e-05   2.66875606e-05   2.27814078e-05   2.15806906e-04]]
+noise_real      =  0.2
+noise_sim       =  0.1
+time step       =  0.2
+number of steps =  300
+(dt+ns)**2      =  0.0004
+run without random Q (Q = Id * (dt+ns)**2)
+Norme L2 |  mesure  |   simu   |  kalman
+1.05e+05 | 6.45e-05 | 1.07e-02 | 4.84e-04
+run with random Q (2000 rand Q is tried at each time step)
+Norme L2 |  mesure  |   simu   |  kalman
+1.05e+05 | 6.45e-05 | 1.07e-02 | 3.70e-04
+average Q obtained
+[[  1.02860702e-03   9.37964437e-05   1.35446850e-04   1.04651955e-04]
+ [  1.11582076e-04   4.81332090e-04   1.07944326e-04   1.03850210e-04]
+ [  1.76911726e-04   9.37406055e-05   1.14840675e-03   9.28725841e-05]
+ [  9.26941048e-05   1.02411928e-04   9.56104509e-05   6.19173429e-04]]
+noise_real      =  0.2
+noise_sim       =  0.2
+time step       =  0.05
+number of steps =  300
+(dt+ns)**2      =  0.0001
+run without random Q (Q = Id * (dt+ns)**2)
+Norme L2 |  mesure  |   simu   |  kalman
+1.11e+04 | 6.08e-04 | 8.02e-03 | 1.82e-03
+run with random Q (2000 rand Q is tried at each time step)
+Norme L2 |  mesure  |   simu   |  kalman
+1.11e+04 | 6.08e-04 | 8.02e-03 | 1.17e-03
+average Q obtained
+[[  6.96781641e-04   2.34466142e-05   9.13592978e-05   2.68387954e-05]
+ [  2.19602799e-05   1.08507745e-04   2.70151379e-05   2.45952077e-05]
+ [  2.35509350e-04   2.05823909e-05   6.34503698e-04   2.50119946e-05]
+ [  2.25913009e-05   2.41883805e-05   2.33065042e-05   2.38707487e-04]]
+noise_real      =  0.2
+noise_sim       =  0.2
+time step       =  0.1
+number of steps =  300
+(dt+ns)**2      =  0.0004
+run without random Q (Q = Id * (dt+ns)**2)
+Norme L2 |  mesure  |   simu   |  kalman
+2.58e+04 | 2.62e-04 | 1.18e-02 | 1.08e-03
+run with random Q (2000 rand Q is tried at each time step)
+Norme L2 |  mesure  |   simu   |  kalman
+2.58e+04 | 2.62e-04 | 1.18e-02 | 7.79e-04
+average Q obtained
+[[  8.34912735e-04   9.87006540e-05   1.33958404e-04   1.03500869e-04]
+ [  9.90413367e-05   4.13816110e-04   1.10718447e-04   1.03332898e-04]
+ [  2.34350882e-04   8.68965960e-05   7.26932815e-04   1.03182544e-04]
+ [  9.38364762e-05   1.02031076e-04   9.72386802e-05   5.85979959e-04]]
+noise_real      =  0.2
+noise_sim       =  0.2
+time step       =  0.2
+number of steps =  300
+(dt+ns)**2      =  0.0016
+run without random Q (Q = Id * (dt+ns)**2)
+Norme L2 |  mesure  |   simu   |  kalman
+1.05e+05 | 6.45e-05 | 1.19e-02 | 3.56e-04
+run with random Q (2000 rand Q is tried at each time step)
+Norme L2 |  mesure  |   simu   |  kalman
+1.05e+05 | 6.45e-05 | 1.19e-02 | 2.73e-04
+average Q obtained
+[[ 0.0019498   0.00038966  0.00042102  0.00039489]
+ [ 0.00040229  0.00159521  0.00038947  0.00039855]
+ [ 0.00048758  0.00038099  0.0019681   0.00041063]
+ [ 0.00038861  0.00039805  0.00042155  0.00215641]]
+noise_real      =  0.2
+noise_sim       =  10
+time step       =  0.05
+number of steps =  300
+(dt+ns)**2      =  0.25
+run without random Q (Q = Id * (dt+ns)**2)
+Norme L2 |  mesure  |   simu   |  kalman
+1.11e+04 | 6.08e-04 | 1.11e-01 | 5.69e-04
+run with random Q (2000 rand Q is tried at each time step)
+Norme L2 |  mesure  |   simu   |  kalman
+1.11e+04 | 6.08e-04 | 1.11e-01 | 4.16e-04
+average Q obtained
+[[ 0.1747034   0.07291465  0.07937322  0.0672895 ]
+ [ 0.06510931  0.21884717  0.06814031  0.06241448]
+ [ 0.06588171  0.05738483  0.17501392  0.06927852]
+ [ 0.06761565  0.07069571  0.08053567  0.21780561]]
+noise_real      =  0.2
+noise_sim       =  10
+time step       =  0.1
+number of steps =  300
+(dt+ns)**2      =  1.0
+run without random Q (Q = Id * (dt+ns)**2)
+Norme L2 |  mesure  |   simu   |  kalman
+2.58e+04 | 2.62e-04 | 1.88e-01 | 2.61e-04
+run with random Q (2000 rand Q is tried at each time step)
+Norme L2 |  mesure  |   simu   |  kalman
+2.58e+04 | 2.62e-04 | 1.88e-01 | 1.79e-04
+average Q obtained
+[[ 0.69381337  0.30381374  0.27274064  0.26112347]
+ [ 0.2747656   0.67875985  0.26578858  0.2870785 ]
+ [ 0.27592342  0.25779405  0.70756385  0.26174901]
+ [ 0.28196259  0.28389966  0.26842054  0.66358292]]
+noise_real      =  0.2
+noise_sim       =  10
+time step       =  0.2
+number of steps =  300
+(dt+ns)**2      =  4.0
+run without random Q (Q = Id * (dt+ns)**2)
+Norme L2 |  mesure  |   simu   |  kalman
+1.05e+05 | 6.45e-05 | 1.83e-01 | 6.53e-05
+run with random Q (2000 rand Q is tried at each time step)
+Norme L2 |  mesure  |   simu   |  kalman
+1.05e+05 | 6.45e-05 | 1.83e-01 | 4.55e-05
+average Q obtained
+[[ 2.48967978  1.27408028  1.04867374  0.95085476]
+ [ 1.01212702  2.35530037  0.98959228  1.15470858]
+ [ 1.12103096  0.84071189  2.83580313  0.97958482]
+ [ 0.99568481  1.47158863  1.19237962  2.55695171]]
+noise_real      =  20
+noise_sim       =  0.05
+time step       =  0.05
+number of steps =  300
+(dt+ns)**2      =  6.25e-06
+run without random Q (Q = Id * (dt+ns)**2)
+Norme L2 |  mesure  |   simu   |  kalman
+1.11e+04 | 6.08e-02 | 6.81e-03 | 6.95e-03
+run with random Q (2000 rand Q is tried at each time step)
+Norme L2 |  mesure  |   simu   |  kalman
+1.11e+04 | 6.08e-02 | 6.81e-03 | 6.37e-03
+average Q obtained
+[[  8.28339859e-06   2.02961634e-06   1.66421120e-06   1.58633317e-06]
+ [  1.51748715e-06   6.39491336e-06   1.53837267e-06   1.45924032e-06]
+ [  1.69573575e-06   1.54105459e-06   7.63641019e-06   1.65996817e-06]
+ [  1.38551252e-06   1.52390043e-06   1.57682989e-06   6.32135579e-06]]
+noise_real      =  20
+noise_sim       =  0.05
+time step       =  0.1
+number of steps =  300
+(dt+ns)**2      =  2.5e-05
+run without random Q (Q = Id * (dt+ns)**2)
+Norme L2 |  mesure  |   simu   |  kalman
+2.58e+04 | 2.62e-02 | 9.68e-03 | 8.69e-03
+run with random Q (2000 rand Q is tried at each time step)
+Norme L2 |  mesure  |   simu   |  kalman
+2.58e+04 | 2.62e-02 | 9.68e-03 | 8.14e-03
+average Q obtained
+[[  4.67376646e-05   7.67426823e-06   5.77261965e-06   5.89566469e-06]
+ [  5.53877094e-06   2.44060543e-05   6.46696654e-06   6.53704018e-06]
+ [  6.02436465e-06   5.89298466e-06   1.08628929e-04   6.61220252e-06]
+ [  5.80312578e-06   5.93007160e-06   5.76617108e-06   2.56667408e-05]]
+noise_real      =  20
+noise_sim       =  0.05
+time step       =  0.2
+number of steps =  300
+(dt+ns)**2      =  0.0001
+run without random Q (Q = Id * (dt+ns)**2)
+Norme L2 |  mesure  |   simu   |  kalman
+1.05e+05 | 6.45e-03 | 1.01e-02 | 4.13e-03
+run with random Q (2000 rand Q is tried at each time step)
+Norme L2 |  mesure  |   simu   |  kalman
+1.05e+05 | 6.45e-03 | 1.01e-02 | 2.89e-03
+average Q obtained
+[[  3.13316483e-04   2.74650282e-05   2.92485873e-05   2.32199047e-05]
+ [  2.25569660e-05   1.29900624e-04   2.55850581e-05   2.27431723e-05]
+ [  2.29909880e-05   2.10173720e-05   5.62490991e-01   2.93585395e-05]
+ [  2.11321085e-05   2.01959668e-05   2.25435529e-05   1.22857429e-04]]
+noise_real      =  20
+noise_sim       =  0.1
+time step       =  0.05
+number of steps =  300
+(dt+ns)**2      =  2.5e-05
+run without random Q (Q = Id * (dt+ns)**2)
+Norme L2 |  mesure  |   simu   |  kalman
+1.11e+04 | 6.08e-02 | 7.20e-03 | 7.33e-03
+run with random Q (2000 rand Q is tried at each time step)
+Norme L2 |  mesure  |   simu   |  kalman
+1.11e+04 | 6.08e-02 | 7.20e-03 | 6.23e-03
+average Q obtained
+[[  3.29462957e-05   7.99986581e-06   6.73478722e-06   6.37662271e-06]
+ [  6.06251360e-06   2.53321968e-05   6.34212185e-06   6.04545325e-06]
+ [  6.69089128e-06   6.22492499e-06   3.07390067e-05   6.80155811e-06]
+ [  5.62381581e-06   5.97581833e-06   6.30307263e-06   2.56205149e-05]]
+noise_real      =  20
+noise_sim       =  0.1
+time step       =  0.1
+number of steps =  300
+(dt+ns)**2      =  0.0001
+run without random Q (Q = Id * (dt+ns)**2)
+Norme L2 |  mesure  |   simu   |  kalman
+2.58e+04 | 2.62e-02 | 1.04e-02 | 7.34e-03
+run with random Q (2000 rand Q is tried at each time step)
+Norme L2 |  mesure  |   simu   |  kalman
+2.58e+04 | 2.62e-02 | 1.04e-02 | 6.59e-03
+average Q obtained
+[[  1.72072609e-04   2.85315191e-05   2.52721569e-05   2.34856005e-05]
+ [  2.37711405e-05   9.81422869e-05   2.53198046e-05   2.28492480e-05]
+ [  2.33288596e-05   2.43359098e-05   3.32377744e-04   2.70365809e-05]
+ [  2.13254127e-05   2.36367553e-05   2.32580367e-05   1.02363822e-04]]
+noise_real      =  20
+noise_sim       =  0.1
+time step       =  0.2
+number of steps =  300
+(dt+ns)**2      =  0.0004
+run without random Q (Q = Id * (dt+ns)**2)
+Norme L2 |  mesure  |   simu   |  kalman
+1.05e+05 | 6.45e-03 | 1.07e-02 | 2.71e-03
+run with random Q (2000 rand Q is tried at each time step)
+Norme L2 |  mesure  |   simu   |  kalman
+1.05e+05 | 6.45e-03 | 1.07e-02 | 2.48e-03
+average Q obtained
+[[  9.60079727e-04   1.76742754e-04   1.11607867e-04   9.55027688e-05]
+ [  1.07370742e-04   3.97147204e-04   8.95444954e-05   8.33389912e-05]
+ [  1.16920601e-04   8.05876920e-05   7.81034957e-03   9.82501136e-05]
+ [  9.52745778e-05   8.53854214e-05   1.02477143e-04   3.77040530e-04]]
+noise_real      =  20
+noise_sim       =  0.2
+time step       =  0.05
+number of steps =  300
+(dt+ns)**2      =  0.0001
+run without random Q (Q = Id * (dt+ns)**2)
+Norme L2 |  mesure  |   simu   |  kalman
+1.11e+04 | 6.08e-02 | 8.02e-03 | 7.74e-03
+run with random Q (2000 rand Q is tried at each time step)
+Norme L2 |  mesure  |   simu   |  kalman
+1.11e+04 | 6.08e-02 | 8.02e-03 | 5.87e-03
+average Q obtained
+[[  1.33651084e-04   3.11544099e-05   2.73159110e-05   2.52991177e-05]
+ [  2.25617361e-05   1.04873416e-04   2.59899865e-05   2.45020264e-05]
+ [  2.72339835e-05   2.65533660e-05   1.23447583e-04   2.86282358e-05]
+ [  2.32897473e-05   2.48154977e-05   2.51899367e-05   1.04539960e-04]]
+noise_real      =  20
+noise_sim       =  0.2
+time step       =  0.1
+number of steps =  300
+(dt+ns)**2      =  0.0004
+run without random Q (Q = Id * (dt+ns)**2)
+Norme L2 |  mesure  |   simu   |  kalman
+2.58e+04 | 2.62e-02 | 1.18e-02 | 5.87e-03
+run with random Q (2000 rand Q is tried at each time step)
+Norme L2 |  mesure  |   simu   |  kalman
+2.58e+04 | 2.62e-02 | 1.18e-02 | 4.78e-03
+average Q obtained
+[[  6.02853598e-04   1.09898350e-04   1.01172967e-04   1.00645668e-04]
+ [  9.70983335e-05   3.89440348e-04   9.78477761e-05   9.20561607e-05]
+ [  1.15774975e-04   9.73034595e-05   8.95363127e-04   1.18584213e-04]
+ [  9.62437615e-05   9.71614290e-05   1.07607281e-04   4.14522520e-04]]
+noise_real      =  20
+noise_sim       =  0.2
+time step       =  0.2
+number of steps =  300
+(dt+ns)**2      =  0.0016
+run without random Q (Q = Id * (dt+ns)**2)
+Norme L2 |  mesure  |   simu   |  kalman
+1.05e+05 | 6.45e-03 | 1.19e-02 | 1.95e-03
+run with random Q (2000 rand Q is tried at each time step)
+Norme L2 |  mesure  |   simu   |  kalman
+1.05e+05 | 6.45e-03 | 1.19e-02 | 1.79e-03
+average Q obtained
+[[ 0.00467971  0.00045167  0.0004755   0.0004215 ]
+ [ 0.00049783  0.00166788  0.00039062  0.00038751]
+ [ 0.00039529  0.00039813  0.01640123  0.00044562]
+ [ 0.0003591   0.00039005  0.00038507  0.00164921]]
+noise_real      =  20
+noise_sim       =  10
+time step       =  0.05
+number of steps =  300
+(dt+ns)**2      =  0.25
+run without random Q (Q = Id * (dt+ns)**2)
+Norme L2 |  mesure  |   simu   |  kalman
+1.11e+04 | 6.08e-02 | 1.11e-01 | 9.77e-03
+run with random Q (2000 rand Q is tried at each time step)
+Norme L2 |  mesure  |   simu   |  kalman
+1.11e+04 | 6.08e-02 | 1.11e-01 | 9.23e-03
+average Q obtained
+[[ 0.24748525  0.06488672  0.06087264  0.0707778 ]
+ [ 0.06607011  0.2541531   0.06257397  0.07059327]
+ [ 0.05873298  0.06412073  0.2748678   0.06846544]
+ [ 0.06335192  0.0713773   0.05346512  0.29115376]]
+noise_real      =  20
+noise_sim       =  10
+time step       =  0.1
+number of steps =  300
+(dt+ns)**2      =  1.0
+run without random Q (Q = Id * (dt+ns)**2)
+Norme L2 |  mesure  |   simu   |  kalman
+2.58e+04 | 2.62e-02 | 1.88e-01 | 5.92e-03
+run with random Q (2000 rand Q is tried at each time step)
+Norme L2 |  mesure  |   simu   |  kalman
+2.58e+04 | 2.62e-02 | 1.88e-01 | 5.52e-03
+average Q obtained
+[[ 0.98353043  0.24568055  0.24790402  0.28021752]
+ [ 0.25812881  1.01252158  0.27252964  0.26038357]
+ [ 0.238183    0.27173037  1.08651465  0.28223926]
+ [ 0.24259415  0.29045511  0.22465223  1.15445437]]
+noise_real      =  20
+noise_sim       =  10
+time step       =  0.2
+number of steps =  300
+(dt+ns)**2      =  4.0
+run without random Q (Q = Id * (dt+ns)**2)
+Norme L2 |  mesure  |   simu   |  kalman
+1.05e+05 | 6.45e-03 | 1.83e-01 | 2.10e-03
+run with random Q (2000 rand Q is tried at each time step)
+Norme L2 |  mesure  |   simu   |  kalman
+1.05e+05 | 6.45e-03 | 1.83e-01 | 1.95e-03
+average Q obtained
+[[ 3.96908883  0.94863069  0.99677691  1.02370608]
+ [ 1.18396976  3.94942218  1.08649854  1.0824629 ]
+ [ 0.94117539  0.98312968  4.50878375  0.98457592]
+ [ 0.95220823  1.06492958  0.95423328  4.48473604]]
+Elapsed 831.257167s
+
+Process finished with exit code 0
+

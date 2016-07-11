@@ -30,14 +30,15 @@ import sys
 import time
 
 Drop = True
-Chaleur = True
-Convection = True
-graphs = True
+Chaleur = False
+Convection = False
+graphs = False
 profiling = False
+
 if profiling:
     import pprofile
 if Drop:
-    from kalman.drop import Drop
+    from kalman.drop import Drop, try_noisy_q
 if Chaleur:
     from kalman.chaleur import Chaleur
 if Convection:
@@ -67,7 +68,8 @@ def run_a_test_case(edp):
     """
     t1 = time.clock()
     for i in range(1):
-        edp.run_test_case(graphs)
+        try_noisy_q(edp)
+        # edp.run_test_case(graphs)
     t2 = time.clock()
     print("Elapsed " + str(t2 - t1) + "s")
 
