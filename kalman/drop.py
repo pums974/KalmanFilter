@@ -502,23 +502,23 @@ def try_noisy_q(edp):
                 print("time step       = ", dt)
                 print("number of steps = ", edp.nIt)
                 print("(dt+ns)**2      = ", noise1)
-                print("run without random Q (Q = Id * (dt+ns)**2)")
+                print("run observator Q (Q = Id * (dt+ns)**2)")
                 print("Norme L2 |  mesure  |   simu   |  kalman")
                 err1 = edp.run_test_case(False)
                 # print(edp.kalman.kalman.Q)
-
+                #
                 # edp.reinit()
                 #
-                # noise1 = (edp.dt * edp.noise_sim) ** 2
-                # noise2 = noise1 / 4.
-                # noise3 = noise1 / 4.
-                # noise4 = noise1 / 4.
-                # noise5 = noise1 / 4.
+                # noise1 = edp.dt ** 2 / 2.
+                # noise2 = edp.dt
+                # noise3 = edp.dt ** 3 / 2.
+                # noise4 = edp.dt ** 4 / 4.
+                # noise5 = edp.dt ** 2
                 # noise6 = noise1 / 4.
-                # edp.kalman.kalman.Q = np.array([[noise1, noise2, noise3, noise4],
-                #                                 [noise2, noise1, noise5, noise6],
-                #                                 [noise3, noise5, noise1, noise2],
-                #                                 [noise4, noise6, noise2, noise1]])
+                # edp.kalman.kalman.Q = np.array([[noise1, noise3, noise4, noise3],
+                #                                 [noise3, noise2, noise3, noise5],
+                #                                 [noise4, noise3, noise1, noise3],
+                #                                 [noise3, noise5, noise3, noise2]]) * edp.noise_sim ** 2
                 # err1 = edp.run_test_case(False)
                 # print(edp.kalman.kalman.Q)
 
