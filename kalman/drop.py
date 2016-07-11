@@ -192,7 +192,7 @@ class KalmanWrapper(SkelKalmanWrapper):
 
         Its dim goes from (n,1) to (n)
         """
-        return self.kalman.X.flatten()
+        return self.kalman.X
 
     def setsol(self, field):
         """

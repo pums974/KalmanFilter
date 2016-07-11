@@ -423,10 +423,28 @@ implicit none
   double precision,parameter :: TWOPI = 2.*acos(-1.)
   double precision,allocatable :: x2pi(:),g2rad(:)
   logical,save :: init = .false.
-  integer,parameter :: myseed = 86456
-  integer :: m,i
+!  integer,parameter :: myseed = 86456
+  integer :: m,i, un, istat, pid
+  integer :: myseed
 
   if(.not.init) then
+    ! First try if the OS provides a random number generator
+    open(newunit=un, file="/dev/urandom", access="stream", &
+         form="unformatted", action="read", status="old", iostat=istat)
+    if (istat == 0) then
+       read(un) myseed
+       close(un)
+    else
+       ! Fallback to XOR:ing the current time and pid. The PID is
+       ! useful in case one launches multiple instances of the same
+       ! program in parallel.
+       call system_clock(myseed)
+       if (myseed == 0) myseed = 86456
+       pid = getpid()
+       myseed = ieor(myseed, int(pid, kind(myseed)))
+    end if
+  
+     myseed = 86456
      call srand(myseed)
      init = .true.
   endif
@@ -445,3 +463,170 @@ implicit none
       enddo
       deallocate(x2pi,g2rad)
 end subroutine gauss_f
+subroutine gauss_f2(reinit, done)
+#ifdef __INTEL_COMPILER
+use IFPORT
+#endif
+implicit none
+  logical,save :: init = .false.
+  integer, intent(in) :: reinit
+!  integer,parameter :: myseed = 86456
+  integer :: m,i, un, istat, pid
+  integer :: myseed
+  integer,intent(out) :: done
+  done = 0
+  if (reinit>0) then
+    init = .false.
+  endif
+      
+  if(.not.init) then
+    ! First try if the OS provides a random number generator
+    open(newunit=un, file="/dev/urandom", access="stream", &
+         form="unformatted", action="read", status="old", iostat=istat)
+    if (istat == 0) then
+       read(un) myseed
+       close(un)
+    else
+       ! Fallback to XOR:ing the current time and pid. The PID is
+       ! useful in case one launches multiple instances of the same
+       ! program in parallel.
+       call system_clock(myseed)
+       if (myseed == 0) myseed = 86456
+       pid = getpid()
+       myseed = ieor(myseed, int(pid, kind(myseed)))
+    end if
+  
+     myseed = 86456
+  
+     call srand(myseed)
+     init = .true.
+  endif
+  done=1
+
+end subroutine gauss_f2
+
+subroutine noisy_q(typ, Q_in, Q_out, ref_value, n)
+#ifdef __INTEL_COMPILER
+use IFPORT
+#endif
+implicit none
+  integer, intent(in) :: typ, n
+  double precision, intent(in)  :: ref_value
+  double precision, intent(in)  :: Q_in(n,n)
+  double precision, intent(out) :: Q_out(n,n)
+  integer :: i,j
+  double precision :: rand_val(6), field_val(6)
+  
+
+
+  if(typ>0) then
+    do i=1,6
+      rand_val(i) = rand()
+    enddo
+  endif
+  
+  select case(typ)
+  case(0) ! exactly ref
+    field_val(1) = ref_value
+    field_val(2) = ref_value
+    field_val(3) = 0.
+    field_val(4) = 0.
+    field_val(5) = 0.
+    field_val(6) = 0.
+  case(1) !  around ref
+    field_val(1) = rand_val(1) * ref_value + 0.5 * ref_value
+    field_val(2) = rand_val(2) * ref_value + 0.5 * ref_value
+    field_val(3) = rand_val(3) * ref_value * 0.5
+    field_val(4) = rand_val(4) * ref_value * 0.5
+    field_val(5) = rand_val(5) * ref_value * 0.5
+    field_val(6) = rand_val(6) * ref_value * 0.5
+  case(2) ! around old_q
+    field_val(1) = rand_val(1) * Q_in(1,1) + 0.5 * Q_in(1,1)
+    field_val(2) = rand_val(2) * Q_in(2,2) + 0.5 * Q_in(2,2)
+    field_val(3) = rand_val(3) * Q_in(1,2) + 0.5 * Q_in(1,2)
+    field_val(4) = rand_val(4) * Q_in(1,3) + 0.5 * Q_in(1,3)
+    field_val(5) = rand_val(5) * Q_in(1,4) + 0.5 * Q_in(1,4)
+    field_val(6) = rand_val(6) * Q_in(2,4) + 0.5 * Q_in(2,4)
+  end select
+
+  Q_out = 0.
+  Q_out(1,1) = field_val(1)
+  Q_out(3,3) = field_val(1)
+  Q_out(2,2) = field_val(2)
+  Q_out(4,4) = field_val(2)
+  Q_out(1,2) = field_val(3)
+  Q_out(2,1) = field_val(3)
+  Q_out(3,4) = field_val(3)
+  Q_out(4,3) = field_val(3)
+  Q_out(1,3) = field_val(4)
+  Q_out(3,1) = field_val(4)
+  Q_out(1,4) = field_val(5)
+  Q_out(4,1) = field_val(5)
+  Q_out(2,3) = field_val(5)
+  Q_out(3,2) = field_val(5)
+  Q_out(2,4) = field_val(6)
+  Q_out(4,2) = field_val(6)
+  
+!  select case(typ)
+!  case(0) ! exactly ref
+!    do i=1,n
+!      Q_out(i,i) = ref_value
+!    enddo
+!  case(1) ! around ref
+!    do j=1,n/2
+!      do i=j,n
+!         if (i == j) then
+!            Q_out(i,j) = 0.5 * ref_value + rand() * ref_value
+!         else
+!            Q_out(i,j) = rand() * ref_value * 0.5
+!            Q_out(j,i) = Q_out(i,j)
+!         endif
+!      enddo
+!    enddo
+!    do j=n/2+1,n
+!      do i=j,n
+!        Q_out(i,j) = Q_out(i-n/2,j-n/2)
+!        Q_out(j,i) = Q_out(i-n/2,j-n/2)
+!      enddo
+!    enddo
+!!    do j=1,n
+!!      do i=j+1,n
+!!         Q_out(i,j) = (Q_out(i,j) + Q_out(j,i)) * 0.5
+!!         Q_out(j,i) = Q_out(i,j)
+!!      enddo
+!!    enddo
+!  case(2) ! around old_q
+!    do j=1,n
+!      do i=1,n
+!         Q_out(i,j) = 0.5 * Q_in(i,j) + rand() * Q_in(i,j)
+!         Q_out(j,i) = Q_out(i,j)
+!      enddo
+!    enddo
+!    do j=n/2+1,n
+!      do i=j,n
+!        Q_out(i,j) = Q_out(i-n/2,j-n/2)
+!        Q_out(j,i) = Q_out(i-n/2,j-n/2)
+!      enddo
+!    enddo
+!!    do j=1,n
+!!      do i=j+1,n
+!!         Q_out(i,j) = (Q_out(i,j) + Q_out(j,i)) * 0.5
+!!         Q_out(j,i) = Q_out(i,j)
+!!      enddo
+!!    enddo
+!  end select
+  
+
+end subroutine noisy_q
+
+
+subroutine norm_l2 (field_1, field_2, norm, n)
+implicit none
+integer, intent(in) :: n
+double precision,intent(in) :: field_1(n),field_2(n)
+double precision, intent(out) :: norm
+
+norm = sum((field_1 - field_2)**2)
+
+end subroutine norm_l2
+

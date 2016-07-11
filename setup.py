@@ -15,7 +15,7 @@
 #       url="https://github.com/pums974/KalmanFilter",
 #       packages=['kalman'],
 #       package_data={'kalman': files},
-#       scripts=["runner"],
+#       scripts=["runner.py"],
 #       long_description="""Really long text here."""
 #       )
 
@@ -41,5 +41,5 @@ numpy.distutils.core.setup(name="Kalman",
                            packages=['kalman'],
                            package_data={'kalman': files},
                            ext_modules=[ext1],
-                           scripts=["runner"],
+                           scripts=["runner.py"],
                            long_description="""Really long text here.""")
