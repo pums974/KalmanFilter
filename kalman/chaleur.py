@@ -231,7 +231,7 @@ class Simulation(SkelSimulation):
         """
             Increment through the next time step of the simulation.
         """
-        power = np.random.normal(self.power, self.noiselevel, self.rhs.shape)
+        power = 0.  # np.random.normal(self.power, self.noiselevel, self.rhs.shape)
         self.rhs = np.zeros([self.size]) + power
         SkelSimulation.step(self)
         self.calcbc()
@@ -381,7 +381,7 @@ class Chaleur(EDP):
         :param field: field
         :return: norm H1
         """
-        return self.grid.norm_h1(field)
+        return self.grid.norm_inf(field)
 
     def plot(self, field):
         """
@@ -454,12 +454,12 @@ class Chaleur(EDP):
 
         print("%8.2e | %8.2e | %8.2e | %8.2e" %
               (Norm_ref, Err_mes, Err_sim, Err_kal))
-        Norm_ref = self.grid.norm_inf(Sol_ref)
-        Err_mes = self.grid.norm_inf(Sol_mes)
-        Err_sim = self.grid.norm_inf(Sol_sim)
-        Err_kal = self.grid.norm_inf(Sol_kal)
-        print("%8.2e | %8.2e | %8.2e | %8.2e" %
-              (Norm_ref, Err_mes, Err_sim, Err_kal))
+        # Norm_ref = self.grid.norm_inf(Sol_ref)
+        # Err_mes = self.grid.norm_inf(Sol_mes)
+        # Err_sim = self.grid.norm_inf(Sol_sim)
+        # Err_kal = self.grid.norm_inf(Sol_kal)
+        # print("%8.2e | %8.2e | %8.2e | %8.2e" %
+        #       (Norm_ref, Err_mes, Err_sim, Err_kal))
 
 
 if __name__ == "__main__":
