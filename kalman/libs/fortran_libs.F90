@@ -203,6 +203,37 @@ endif
    
 end subroutine dery_upwind_f
 
+subroutine kalman_apply_obs_f(Phi, S1, Q, R, Y, X1,s,x,n1)
+  implicit none
+  integer,intent(in) :: n1
+  double precision,intent(in) :: Phi(n1), R(n1), Q(n1), Y(n1)
+  double precision ,intent(in):: S1(n1),X1(n1)
+  double precision,intent(out):: S(n1),X(n1)
+
+  double precision :: innovation_covariance , innovation, k
+  integer :: i,INFO
+
+  do i = 1,n1
+    
+    ! -------------------------Prediction step-----------------------------
+    S(i) = Phi(i)*S1(i)*Phi(i) + Q(i)
+
+    ! ------------------------Observation step-----------------------------
+    innovation_covariance = S(i) + R(i)
+    innovation = Y(i) - X1(i)
+
+
+    ! ---------------------------Update step-------------------------------
+    K = S(i) / innovation_covariance
+    
+    x(i) = x1(i) + k * innovation
+    
+    s(i) = (1.-k) * s(i)
+  enddo
+  
+end subroutine kalman_apply_obs_f
+
+
 subroutine kalman_apply_f(Phi, S1, Q, M, R, Y, X1,s,x,n1,n2)
   implicit none
   integer,intent(in) :: n1,n2

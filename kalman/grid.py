@@ -5,10 +5,10 @@
 """
 from __future__ import print_function, absolute_import
 import numpy as np
-#import matplotlib.pyplot as plt
-#from matplotlib import animation
-#from matplotlib import cm
-#from mpl_toolkits.mplot3d import Axes3D
+import matplotlib.pyplot as plt
+from matplotlib import animation
+from matplotlib import cm
+from mpl_toolkits.mplot3d import Axes3D
 import sys
 try:
     if sys.version_info < (3, ):

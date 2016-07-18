@@ -20,7 +20,7 @@ from numpy.polynomial import polynomial as P
 from multiprocessing import Pool, Process, Queue, Array
 from Queue import Empty
 try:
-    from kalman.kalman import KalmanFilter
+    from kalman.kalman import KalmanFilter, KalmanFilterObservator
     from kalman.skeleton import *
     from kalman.grid import Grid_DF2
     from kalman.tools import gc_clean
@@ -30,7 +30,7 @@ try:
         from kalman.libs.fortran_libs_py3 import test_prec
     
 except:
-    from kalman import KalmanFilter
+    from kalman import KalmanFilter, KalmanFilterObservator
     from skeleton import *
     from grid import Grid_DF2
     from tools import gc_clean
@@ -258,7 +258,7 @@ class Simulation(SkelSimulation):
         self.calcbc()
 
 
-class KalmanWrapper(SkelKalmanWrapper):
+class KalmanWrapper(SkelKalmanObservatorWrapper):
     """
         This class is use around the simulation to apply the kalman filter
     """
@@ -268,16 +268,16 @@ class KalmanWrapper(SkelKalmanWrapper):
         SkelKalmanWrapper.__init__(self, _reality, _sim)
         self.size = self.kalsim.size
         _M = self.getwindow()  # Observation matrix.
-        self.kalman = KalmanFilter(self.kalsim, _M)
+        self.kalman = KalmanFilterObservator(self.kalsim, _M)
         indx = self.kalsim.grid.indx
 
-        # Initial covariance estimate.
-        self.kalman.S = np.eye(self.kalman.size_s) * \
-            0. ** 2
+#        # Initial covariance estimate.
+#        self.kalman.S = np.eye(self.kalman.size_s) * \
+#            0. ** 2
 
-        # Estimated error in measurements.
-        self.kalman.R = np.eye(self.kalman.size_o) * \
-            self.reality.noiselevel ** 2
+#        # Estimated error in measurements.
+#        self.kalman.R = np.eye(self.kalman.size_o) * \
+#            self.reality.noiselevel ** 2
 
         # Estimated error in process.
         # G = np.zeros([self.kalman.size_s, 1])
@@ -290,8 +290,15 @@ class KalmanWrapper(SkelKalmanWrapper):
         #
         # self.kalman.Q = G.dot(np.transpose(G)) * self.kalsim.noiselevel ** 2
 
-        self.kalman.Q = np.eye(self.kalman.size_s) * \
-            self.kalnoise ** 2
+#        self.kalman.Q = np.eye(self.kalman.size_s) * \
+#            self.kalnoise ** 2
+
+        self.kalman.S = np.empty([self.kalman.size_s])
+        self.kalman.R = np.empty([self.kalman.size_o])
+        self.kalman.Q = np.empty([self.kalman.size_s])
+        self.kalman.R.fill(self.reality.noiselevel ** 2)
+        self.kalman.Q.fill(self.kalnoise ** 2)
+            
         gc_clean()
 
     def getwindow(self):
@@ -348,12 +355,12 @@ class Chaleur(EDP):
     """
     Lx = 2.
     Ly = 2.
-    nx = 6
-    ny = 6
+    nx = 30
+    ny = 30
     power = 1.
-    noise_real = 0.003
+    noise_real = 0.3
     noise_sim = 0.
-    dt = 0.005
+    dt = 0.001
     nIt = 50
     name = "Chaleur"
 
@@ -484,8 +491,8 @@ class Chaleur(EDP):
 
         # ------------------------ Final output ----------------------------
 
-#        print("%8.2e | %8.2e | %8.2e | %8.2e" %
-#              (Norm_ref, Err_mes, Err_sim, Err_kal))
+        print("%8.2e | %8.2e | %8.2e | %8.2e" %
+              (Norm_ref, Err_mes, Err_sim, Err_kal))
         # Norm_ref = self.grid.norm_inf(Sol_ref)
         # Err_mes = self.grid.norm_inf(Sol_mes)
         # Err_sim = self.grid.norm_inf(Sol_sim)
@@ -826,5 +833,5 @@ def find_min():
 if __name__ == "__main__":
 #    print(1.+1e-16 -1., test_prec(1., 1e-16, 1.))
 #    print(1.+1e-15 -1., test_prec(1., 1e-15, 1.))
-    find_min()
-#    Chaleur().run_test_case(True, 1e-4)
+#    find_min()
+    Chaleur().run_test_case(False, 1e-2, False)

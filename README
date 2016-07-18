@@ -10,8 +10,8 @@ export COMP="intelem"
 #export DBG="-O0 -g3 -fbacktrace -fcheck=all -pedantic -ffpe-trap=zero,overflow,invalid -finit-real=snan"
 #export COMP="gnu95"
 
-f2py "${LIBS}" -c fortran_libs.F90 -m fortran_libs_py2 --opt=\""${OPTS}"\" --noarch --fcompiler="${COMP}"
+f2py2 "${LIBS}" -c fortran_libs.F90 -m fortran_libs_py2 --opt=\""${OPTS}"\" --noarch --fcompiler="${COMP}"
 #f2py "${LIBS}" -c fortran_libs.F90 -m fortran_libs_py2 --opt=\""${DBG}"\" --noarch --fcompiler="${COMP}" --debug
 
-#f2py3 "${LIBS}" -c fortran_libs.F90 -m fortran_libs_py3 --opt=\""${OPTS}"\" --noarch --fcompiler="${COMP}"
+f2py3 "${LIBS}" -c fortran_libs.F90 -m fortran_libs_py3 --opt=\""${OPTS}"\" --noarch --fcompiler="${COMP}"
 #f2py3 "${LIBS}" -c fortran_libs.F90 -m fortran_libs_py3 --opt=\""${DBG}"\" --noarch --fcompiler="${COMP}" --debug
