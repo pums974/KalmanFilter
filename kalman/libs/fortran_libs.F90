@@ -412,6 +412,7 @@ end function inv
 end subroutine kalman_apply_f
 
 subroutine gauss_f(mu, dev, out, n)
+use iso_fortran_env, only: int64
 #ifdef __INTEL_COMPILER
 use IFPORT
 #endif
@@ -424,10 +425,14 @@ implicit none
   double precision,allocatable :: x2pi(:),g2rad(:)
   logical,save :: init = .false.
 !  integer,parameter :: myseed = 86456
-  integer :: m,i, un, istat, pid
-  integer :: myseed
-
+  integer :: m,i, un, istat, pid,nseed
+  integer,allocatable :: myseed(:)
+  integer(int64) :: t
+            
   if(.not.init) then
+    call random_seed(size = nseed)
+    allocate(myseed(nseed))
+    
     ! First try if the OS provides a random number generator
     open(newunit=un, file="/dev/urandom", access="stream", &
          form="unformatted", action="read", status="old", iostat=istat)
@@ -438,22 +443,25 @@ implicit none
        ! Fallback to XOR:ing the current time and pid. The PID is
        ! useful in case one launches multiple instances of the same
        ! program in parallel.
-       call system_clock(myseed)
-       if (myseed == 0) myseed = 86456
+       call system_clock(t)
+       if (t == 0) myseed = 86456
        pid = getpid()
-       myseed = ieor(myseed, int(pid, kind(myseed)))
+       myseed = int(ieor(t, int(pid, kind(t))),kind(myseed))
     end if
   
-     myseed = 86456
-     call srand(myseed)
+!     myseed = 86456
+     call random_seed(put=myseed)
+     deallocate(myseed)
      init = .true.
   endif
 
     m = ceiling(n/2.)
     allocate(x2pi(m),g2rad(m))
+      call RANDOM_NUMBER(x2pi)
+      call RANDOM_NUMBER(g2rad)
       do i = 1,m
-        x2pi(i) = rand() * TWOPI
-        g2rad(i) = sqrt(-2.d0 * log(1.d0 - rand()))
+        x2pi(i) = x2pi(i) * TWOPI
+        g2rad(i) = sqrt(-2.d0 * log(1.d0 - g2rad(i)))
       enddo
       do i = 1,size(mu),2
         out(i) = mu(i) + cos(x2pi(ceiling(i/2.))) * g2rad(ceiling(i/2.)) * dev
@@ -463,7 +471,9 @@ implicit none
       enddo
       deallocate(x2pi,g2rad)
 end subroutine gauss_f
+
 subroutine gauss_f2(reinit, done)
+use iso_fortran_env, only: int64
 #ifdef __INTEL_COMPILER
 use IFPORT
 #endif
@@ -471,15 +481,19 @@ implicit none
   logical,save :: init = .false.
   integer, intent(in) :: reinit
 !  integer,parameter :: myseed = 86456
-  integer :: m,i, un, istat, pid
-  integer :: myseed
+  integer :: m,i, un, istat, pid,nseed
+  integer,allocatable :: myseed(:)
   integer,intent(out) :: done
+  integer(int64) :: t
   done = 0
   if (reinit>0) then
     init = .false.
   endif
       
   if(.not.init) then
+    call random_seed(size = nseed)
+    allocate(myseed(nseed))
+    
     ! First try if the OS provides a random number generator
     open(newunit=un, file="/dev/urandom", access="stream", &
          form="unformatted", action="read", status="old", iostat=istat)
@@ -490,15 +504,15 @@ implicit none
        ! Fallback to XOR:ing the current time and pid. The PID is
        ! useful in case one launches multiple instances of the same
        ! program in parallel.
-       call system_clock(myseed)
-       if (myseed == 0) myseed = 86456
+       call system_clock(t)
+       if (t == 0) myseed = 86456
        pid = getpid()
-       myseed = ieor(myseed, int(pid, kind(myseed)))
+       myseed = int(ieor(t, int(pid, kind(t))),kind(myseed))
     end if
   
-     myseed = 86456
-  
-     call srand(myseed)
+!     myseed = 86456
+     call random_seed(put=myseed)
+     deallocate(myseed)
      init = .true.
   endif
   done=1
@@ -520,9 +534,7 @@ implicit none
 
 
   if(typ>0) then
-    do i=1,6
-      rand_val(i) = rand()
-    enddo
+    call RANDOM_NUMBER(rand_val)
   endif
   
   select case(typ)
@@ -629,4 +641,13 @@ double precision, intent(out) :: norm
 norm = sum((field_1 - field_2)**2)
 
 end subroutine norm_l2
+
+subroutine test_prec (a,b,c,d)
+implicit none
+double precision,intent(in) :: a,b,c
+double precision, intent(out) :: d
+
+d = a + b - c 
+
+end subroutine test_prec
 

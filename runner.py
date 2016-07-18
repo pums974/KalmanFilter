@@ -29,17 +29,17 @@ import sys
 # import os
 import time
 
-Drop = True
-Chaleur = False
+Drop = False
+Chaleur = True
 Convection = False
 graphs = False
-profiling = True
+profiling = False
 if profiling:
     import pprofile
 if Drop:
-    from kalman.drop import Drop, find_min
+    from kalman.drop import Drop
 if Chaleur:
-    from kalman.chaleur import Chaleur
+    from kalman.chaleur import Chaleur, find_min
 if Convection:
     from kalman.convection import Convection
 

@@ -1,0 +1,22 @@
+#PBS -N Kalman
+#PBS -l select=1:ncpus=20:mpiprocs=1
+##PBS -q test
+#PBS -q normal
+
+module purge
+#module load gnu-compilers/4.8.3 openmpi/1.8.3
+module load intel-compilers-16 intel-cmkl-16 codes/python/2.7.12 mpt/2.12
+
+cd $PBS_O_WORKDIR
+
+NPROCS=`wc -l < $PBS_NODEFILE`
+
+BIN="/home/apoux/scratch/Kalman/kalman/chaleur.py"
+
+export OMP_NUM_THREADS=1
+
+date > output.pbs
+export OMP_NUM_THREADS=1
+time python $BIN 2>&1 | tee -a output.pbs
+date >> output.pbs
+

@@ -14,22 +14,39 @@
 """
 from __future__ import print_function, absolute_import
 import numpy as np
-import matplotlib.pyplot as plt
+from numpy.polynomial import polynomial as P
+#import matplotlib.pyplot as plt
+#from matplotlib import animation
+from multiprocessing import Pool, Process, Queue, Array
+from Queue import Empty
 try:
     from kalman.kalman import KalmanFilter
     from kalman.skeleton import *
     from kalman.grid import Grid_DF2
     from kalman.tools import gc_clean
+    if sys.version_info < (3, ):
+        from kalman.libs.fortran_libs_py2 import test_prec
+    else:
+        from kalman.libs.fortran_libs_py3 import test_prec
+    
 except:
     from kalman import KalmanFilter
     from skeleton import *
     from grid import Grid_DF2
     from tools import gc_clean
+    if sys.version_info < (3, ):
+        from libs.fortran_libs_py2 import test_prec
+    else:
+        from libs.fortran_libs_py3 import test_prec
 import math
 import sys
+import time
+
 
 if sys.version_info < (3, ):
     range = xrange
+
+class Namespace: pass
 
 
 class Reality(SkelReality):
@@ -94,9 +111,13 @@ class Simulation(SkelSimulation):
     cfl = 1. / 4.
 
     # ---------------------------------METHODS-----------------------------------
-    def __init__(self, _grid, _power, _noiselevel):
+    def __init__(self, _grid, _power, _noiselevel, _dt):
         self.grid = _grid
-        self.dt = min([self.grid.dx**2, self.grid.dy**2]) * self.cfl
+        # self.dt = min([self.grid.dx**2, self.grid.dy**2]) * self.cfl
+        self.dt = _dt
+        if min([self.grid.dx**2, self.grid.dy**2]) * self.cfl < self.dt:
+            print("CFL not respected")
+            exit()
 
         SkelSimulation.__init__(self, _noiselevel, self.dt, self.grid.shape)
         self.power = _power
@@ -242,7 +263,8 @@ class KalmanWrapper(SkelKalmanWrapper):
         This class is use around the simulation to apply the kalman filter
     """
 
-    def __init__(self, _reality, _sim):
+    def __init__(self, _reality, _sim, _kalnoise):
+        self.kalnoise = _kalnoise
         SkelKalmanWrapper.__init__(self, _reality, _sim)
         self.size = self.kalsim.size
         _M = self.getwindow()  # Observation matrix.
@@ -251,7 +273,7 @@ class KalmanWrapper(SkelKalmanWrapper):
 
         # Initial covariance estimate.
         self.kalman.S = np.eye(self.kalman.size_s) * \
-            self.reality.noiselevel ** 2
+            0. ** 2
 
         # Estimated error in measurements.
         self.kalman.R = np.eye(self.kalman.size_o) * \
@@ -269,7 +291,7 @@ class KalmanWrapper(SkelKalmanWrapper):
         # self.kalman.Q = G.dot(np.transpose(G)) * self.kalsim.noiselevel ** 2
 
         self.kalman.Q = np.eye(self.kalman.size_s) * \
-            self.kalsim.noiselevel ** 2
+            self.kalnoise ** 2
         gc_clean()
 
     def getwindow(self):
@@ -325,14 +347,14 @@ class Chaleur(EDP):
         * how to plot the results
     """
     Lx = 2.
-    Ly = 3.
-    nx = 20
-    ny = 20
+    Ly = 2.
+    nx = 6
+    ny = 6
     power = 1.
-    noise_real = 0.01
-    noise_sim = 0.01
-    dt = 0.
-    nIt = 150
+    noise_real = 0.003
+    noise_sim = 0.
+    dt = 0.005
+    nIt = 50
     name = "Chaleur"
 
     def __init__(self):
@@ -340,21 +362,21 @@ class Chaleur(EDP):
         self.grid = Grid_DF2(self.nx, self.ny, self.Lx, self.Ly)
         self.grid.coordx += self.grid.Lx / 2.
         self.grid.coordy += self.grid.Ly / 2.
-        self.reinit()
+        self.reinit(self.noise_sim)
         gc_clean()
 
-        print("cfl = ",
-              max([self.dt / (self.grid.dx**2), self.dt / (self.grid.dy**2)]))
-        print("dt = ", self.dt)
-        print("Norme H1 |  reality |   simu   |  kalman")
+        # print("cfl = ",
+        #       max([self.dt / (self.grid.dx**2), self.dt / (self.grid.dy**2)]))
+        # print("dt = ", self.dt)
+        # print("Norme H1 |  reality |   simu   |  kalman")
 
-    def reinit(self):
+    def reinit(self, _kalnoise):
         """
             Reinit everything
         :return:
         """
-        self.simulation = Simulation(self.grid, 0., self.noise_sim)
-        self.kalsim = Simulation(self.grid, 0., self.noise_sim)
+        self.simulation = Simulation(self.grid, 0., self.noise_sim, self.dt)
+        self.kalsim = Simulation(self.grid, 0., self.noise_sim, self.dt)
 
         self.dt = self.simulation.dt
         self.reality = Reality(self.grid, self.power, self.noise_real, self.dt)
@@ -363,7 +385,7 @@ class Chaleur(EDP):
         self.kalsim.nIt = self.nIt
         self.reality.nIt = self.nIt
 
-        self.kalman = KalmanWrapper(self.reality, self.kalsim)
+        self.kalman = KalmanWrapper(self.reality, self.kalsim, _kalnoise)
 
     def compute(self, simu):
         """
@@ -381,7 +403,7 @@ class Chaleur(EDP):
         :param field: field
         :return: norm H1
         """
-        return self.grid.norm_inf(field)
+        return self.grid.norm_h1(field)
 
     def plot(self, field):
         """
@@ -404,12 +426,17 @@ class Chaleur(EDP):
         """
         self.grid.animatewithnoise(simu, self.compute, self.norm)
 
-    def run_test_case(self, graphs):
+    def run_test_case(self, graphs, _kalnoise, kalonly):
         """
             Run the test case
         :return:
         """
-        self.reinit()
+        self.reinit(_kalnoise)
+
+        Norm_ref = 1.
+        Err_mes = -1.
+        Err_sim = -1.
+        Err_kal = -1.
 
         # ----------------- Compute reality and measurement -------------------
         if graphs:
@@ -417,50 +444,387 @@ class Chaleur(EDP):
         else:
             for it in self.compute(self.reality):
                 pass
-        Sol_ref = self.reality.getsol()
-        if graphs:
-            self.animatewithnoise(self.reality)
-        Sol_mes = self.reality.getsolwithnoise()
 
-        Norm_ref = self.norm(Sol_ref)
-        Err_mes = self.norm(Sol_ref - Sol_mes) / Norm_ref
+        if not kalonly:
+            if graphs:
+                self.animatewithnoise(self.reality)
 
-        # ------------------------ Compute simulation without Kalman ----------
-        self.reality.reinit()
-        # Initial solution
-        self.simulation.setsol(self.reality.getsolwithnoise())
-        if graphs:
-            self.animate(self.simulation)
-        else:
-            for it in self.compute(self.simulation):
-                pass
-        Sol_sim = self.simulation.getsol()
-        Err_sim = self.norm(Sol_ref - Sol_sim) / Norm_ref
+        if not kalonly:
+            # ------------------------ Compute simulation without Kalman ----------
+            self.reality.reinit()
+            # Initial solution
+            self.simulation.setsol(self.reality.getsol())
+            if graphs:
+                self.animate(self.simulation)
+            else:
+                for it in self.compute(self.simulation):
+                    pass
 
         # ------------------------ Compute simulation with Kalman -------------
         self.reality.reinit()
         # Initial solution
-        self.kalman.setsol(self.reality.getsolwithnoise())
+        self.kalman.setsol(self.reality.getsol())
 
         if graphs:
             self.animate(self.kalman)
         else:
             for it in self.compute(self.kalman):
                 pass
+                
+        Sol_ref = self.reality.getsol()
+        Norm_ref = self.norm(Sol_ref)
+        if not kalonly:
+            Sol_mes = self.reality.getsolwithnoise()
+            Err_mes = self.norm(Sol_ref - Sol_mes) / Norm_ref
+            Sol_sim = self.simulation.getsol()
+            Err_sim = self.norm(Sol_ref - Sol_sim) / Norm_ref
+            
         Sol_kal = self.kalman.getsol()
         Err_kal = self.norm(Sol_ref - Sol_kal) / Norm_ref
 
         # ------------------------ Final output ----------------------------
 
-        print("%8.2e | %8.2e | %8.2e | %8.2e" %
-              (Norm_ref, Err_mes, Err_sim, Err_kal))
+#        print("%8.2e | %8.2e | %8.2e | %8.2e" %
+#              (Norm_ref, Err_mes, Err_sim, Err_kal))
         # Norm_ref = self.grid.norm_inf(Sol_ref)
         # Err_mes = self.grid.norm_inf(Sol_mes)
         # Err_sim = self.grid.norm_inf(Sol_sim)
         # Err_kal = self.grid.norm_inf(Sol_kal)
         # print("%8.2e | %8.2e | %8.2e | %8.2e" %
         #       (Norm_ref, Err_mes, Err_sim, Err_kal))
+        return Norm_ref, Err_mes, Err_sim, Err_kal
 
+
+def do_work(q, r, flag, rank):
+    while True:
+        try:
+            kalnoise = q.get(block=False)
+            if flag[0] == 1:
+                # print("Got a job")
+                Norm_ref, Err_mes, Err_sim, Err_kal = Chaleur().run_test_case(False, kalnoise, True)
+                # print("job done")
+                r.put(Err_kal)
+            # else:
+                # print("emptying the queue")
+        except Empty:
+            if flag[0] == 1:
+                # print("ready to compute")
+                flag[rank] = 1
+            if flag[0] == 0:
+                # print("queue empty")
+                flag[rank] = 0
+            if flag[0] == -1:
+                break
+
+
+def find_min():
+
+    def fx():
+        err = 0.
+        minerr = 1e10
+        maxerr = 0.
+        # print("ready to compute ?")
+        compute[0] = 1
+        while max(compute) < 1:
+            pass
+        # print("giving job")
+        for it in range(100):
+            work_queue.put(ns.kalnoise)
+        # print("getting results")
+        for it in range(100000):
+            err1 = res_queue.get()
+            work_queue.put(ns.kalnoise)
+            err += err1
+            minerr = min(minerr, err1)
+            maxerr = max(maxerr, err1)
+            # print(abs(it * err1 / err-1.))
+            # print(err/it, err1, err1 / err)
+            if err1 / err < ns.eps:
+                break
+        # print("getting the rest")
+        compute[0] = 0
+        while not res_queue.empty():
+            err1 = res_queue.get()
+            err += err1
+            it += 1
+        # print("waiting for process")
+        while max(compute) > 0:
+            pass
+        # print("done")
+        err = err / it
+        confidence = (maxerr - minerr) / it
+
+        return err, confidence
+
+
+    def animate():
+        """
+            Perform the optimisation and produce animation a the same time
+        :param simu: the simulation to perform
+        :param compute: the generator to compute time stns.eps
+        """
+
+        def plot_update(data):
+            """
+                Update the plot
+            :return: surface to be plotted
+            """
+            _kalnoise, _err, _conf = data
+            ns.kalnoises.append(_kalnoise)
+            ns.errs.append(_err)
+            ns.confs.append(_conf*1e5)
+            ax.clear()
+#            surf = ax.scatter(ns.kalnoises, ns.errs, s=ns.confs, marker='.', alpha=0.5)
+            surf = ax.scatter(ns.kalnoises, ns.errs, marker='.')
+            ax.set_xlim(np.min(ns.kalnoises)*0.6, np.max(ns.kalnoises)*1.1)
+            ax.set_ylim(np.min(ns.errs)*0.8, np.max(ns.errs)*1.1)
+            return surf,
+
+        fig, ax = plt.subplots()
+        ax.set_xlim(0.,1.)
+        ax.set_ylim(0.,1.)
+
+        _ = animation.FuncAnimation(fig,
+                                    plot_update,
+                                    next_val)
+        plt.show()
+
+    def next_val1():
+        ns.best_kalnoise *= 0.8
+        old_best_kalnoise = ns.best_kalnoise - ns.alpha
+        for gtf in range(3):
+            cntgtf = 0
+            cntlost = 0
+
+            ns.kalnoise = ns.best_kalnoise
+            ns.alpha1 = abs(old_best_kalnoise - ns.best_kalnoise) * 0.5
+            if ns.alpha1 > 1e-10:
+                ns.alpha = ns.alpha1
+            old_best_kalnoise = ns.best_kalnoise
+
+            ns.eps = ns.eps * 0.5
+            it = 0
+            print("start        -1 %9.2e " % (abs(ns.kalnoise)), end=" ")
+            err, conf = fx()
+            print(" %9.2e  %9.2e " % (err, conf))
+            old_dir = 1
+
+            old_kalnoise = ns.kalnoise
+            old_err = err
+            ns.best_err = err
+            for opt in range(100):
+                yield ns.kalnoise, err, conf
+                ns.kalnoise += ns.alpha
+                print("continuing  %3i %9.2e " % (opt, abs(ns.kalnoise)), end=" ")
+                err, conf = fx()
+                print(" %9.2e  %9.2e " % (err, conf), end=" ")
+                der = (err - old_err) / (ns.kalnoise - old_kalnoise)
+#                print(" %9.2e " % (der), end=" ")
+                if abs(der) < 1e-10:
+                    print("Fin")
+                    break
+                if abs(der) > 1e+10:
+                    print("Fin : ns.alpha too small")
+                    break
+                dir = -der / abs(der)
+                if err < ns.best_err:
+                    ns.best_kalnoise = ns.kalnoise
+                    ns.best_err = err
+                    print("", end=" * ")
+                if abs(err - old_err) < conf:
+                    print("stagnation")
+                else:
+                    if dir != old_dir:
+                        # print("gone too far",ns.kalnoise,old_kalnoise, ns.alpha)
+                        # print("gone too far", ns.kalnoise, err, old_kalnoise,old_err)
+                        print("gone too far")
+                        old_dir = dir
+                        # ns.kalnoise = old_kalnoise - ns.alpha
+                        ns.alpha *= - 0.5
+                        cntgtf += 1
+                        if cntgtf >= 5:
+                            print("Fin : gtf")
+                            break
+                    else:
+                        # cntgtf = 0
+                        if err > ns.best_err:
+                            cntlost += 1
+                        if cntlost > 20:
+                            print("Fin : lost")
+                            break
+                        print("")
+                # print("")
+                old_kalnoise = ns.kalnoise
+                old_err = err
+
+            print("Fin opt")
+        print("Fin gtf")
+
+    def next_val_big_graph():
+        for ns.alpha in [1e-5, 1e-6, 1e-7]:
+            start = 0.
+            end = 20. * ns.alpha
+            for it1 in range(2):
+                ns.kalnoise = start
+                err, conf = fx()
+                output = open("data.dat",'a')
+                output.write("%.15f  %.15f\n" % (ns.kalnoise, err))
+                output.close()
+                yield ns.kalnoise, err, conf
+                if err < ns.best_err:
+                    print("%8.2e  %8.2e" % (ns.kalnoise, err))
+                    ns.best_kalnoise = ns.kalnoise
+                    ns.best_err = err
+                while ns.kalnoise < end:
+                    ns.kalnoise += ns.alpha
+                    err, conf = fx()
+                    output = open("data.dat",'a')
+                    output.write("%.15f  %.15f\n" % (ns.kalnoise, err))
+                    output.close()
+                    yield ns.kalnoise, err, conf
+                    if err < ns.best_err:
+                        print("%8.2e  %8.2e" % (ns.kalnoise, err))
+                        ns.best_kalnoise = ns.kalnoise
+                        ns.best_err = err
+                start = ns.best_kalnoise * 0.2
+                ns.alpha = ns.best_kalnoise * 0.1
+
+    def next_val():
+        start = guess * 0.2
+        ns.alpha = guess * 0.1
+        end = guess * 3
+        for it1 in range(5):
+            ns.kalnoise = start
+            err, conf = fx()
+            output = open("data.dat",'a')
+            output.write("%.15f  %.15f\n" % (ns.kalnoise, err))
+            output.close()
+            yield ns.kalnoise, err, conf
+            if err < ns.best_err:
+                print("%8.2e  %8.2e" % (ns.kalnoise, err))
+                ns.best_kalnoise = ns.kalnoise
+                ns.best_err = err
+#            while ns.kalnoise < ns.best_kalnoise * 1.8:
+            while ns.kalnoise < end:
+                ns.kalnoise += ns.alpha
+                err, conf = fx()
+                output = open("data.dat",'a')
+                output.write("%.15f  %.15f\n" % (ns.kalnoise, err))
+                output.close()
+                yield ns.kalnoise, err, conf
+                if err < ns.best_err:
+                    print("%8.2e  %8.2e" % (ns.kalnoise, err))
+                    ns.best_kalnoise = ns.kalnoise
+                    ns.best_err = err
+            start = ns.best_kalnoise * 0.2
+            ns.alpha = ns.best_kalnoise * 0.1
+            end = ns.best_kalnoise * 1.8
+        
+
+    edp = Chaleur()
+    print("dx       = %8.2e" % (edp.grid.dx))
+    print("dy       = %8.2e" % (edp.grid.dy))
+    print("dt       = %8.2e" % (edp.dt))
+    print("nr       = %8.2e" % (edp.noise_real))
+    print("ns       = %8.2e" % (edp.noise_sim))
+#    guess = 1e-3 + edp.dt**2
+#    guess = -3.6e-4 * np.log(edp.dt) - 1.7e-3
+#    guess = 1.4e-2 * (np.log(edp.dt) + 8.63) * ((edp.grid.dx*edp.grid.dy) ** 3)
+    guess = 6.56e-4
+#    guess = 9e-5
+    print("dx*dy*dt = %8.2e" % (guess))
+
+    Norm_ref, Err_mes, Err_sim, Err_kal = edp.run_test_case(False, guess, False)
+    print("Norme H1 |  reality |   simu   |  kalman")
+    print("%8.2e | %8.2e | %8.2e | %8.2e" %
+          (Norm_ref, Err_mes, Err_sim, Err_kal))
+
+    nproc = 20
+    work_queue = Queue()
+    res_queue = Queue()
+    compute = Array('i', nproc+1)
+    for i in range(nproc+1):
+        compute[i] = 0
+
+    processes = [Process(target=do_work,
+                         args=(work_queue,
+                               res_queue,
+                               compute, i+1))
+                 for i in range(nproc)]
+
+    for p in processes:
+        p.start()
+    print("status       it  kalnoise       err        conf    comment")
+
+    ns = Namespace()
+
+    ns.best_kalnoise = guess
+    ns.best_err = 1e10
+    ns.eps = 2e-3
+    ns.alpha = guess * 0.25
+
+
+    ns.kalnoises = []
+    ns.errs = []
+    ns.confs = []
+    output = open("data.dat",'w')
+    output.close()
+    results_kalnoise = np.zeros(5)
+    results_err = np.zeros(5)
+        
+#    for global_test in range(3):
+##        for optim in next_val():
+##            pass
+#        animate()
+
+#        results_kalnoise[global_test] = ns.best_kalnoise
+#        results_err[global_test] = ns.best_err
+
+#    for _kalnoise, _err, _conf in next_val_big_graph():
+    for _kalnoise, _err, _conf in next_val():
+        ns.kalnoises.append(_kalnoise)
+        ns.errs.append(_err)
+        ns.confs.append(_conf)
+#    animate()
+#    ns.output.close()
+    print("FIN")
+#    print(results_kalnoise)
+#    print(ns.best_err)
+
+
+    data = np.zeros([2,len(ns.kalnoises)])
+    data[0] = ns.kalnoises
+    data[1] = ns.errs
+    data = data[:,data[0,:].argsort()]
+    coef = np.polyfit(data[0][:], data[1][:], 4)[::-1]
+    print("%8.2e x^4 + %8.2e x^3 + %8.2e x^2 + %8.2e x + %8.2e" % 
+          (coef[4], coef[3], coef[2], coef[1], coef[0]))
+    polyder = P.polyder(coef)
+    polyder2 = P.polyder(coef,2)
+    roots = P.polyroots(polyder)
+    ns.eps = ns.eps / 10.
+    ns.best_err = 1e10
+    for root in roots:
+        ns.kalnoise = abs(root.real)
+        der2 = P.polyval(ns.kalnoise,polyder2)
+        if der2 > 0:
+            err, conf = fx()
+            if err < ns.best_err:
+                ns.best_err = err
+                ns.best_kalnoise = ns.kalnoise
+            print("%8.2e %8.2e %8.2e" % (ns.kalnoise, err, der2))
+        else:
+            print("%8.2e not a minimum : %8.2e %8.2e" % (ns.kalnoise, P.polyval(ns.kalnoise,coef), der2))
+    output = open("data.dat",'a')
+    output.write("%.15f  %.15f\n" % (ns.best_kalnoise , ns.best_err))
+    output.close()
+
+    compute[0] = -1
+    for p in processes:
+        p.join()
 
 if __name__ == "__main__":
-    Chaleur().run_test_case(False)
+#    print(1.+1e-16 -1., test_prec(1., 1e-16, 1.))
+#    print(1.+1e-15 -1., test_prec(1., 1e-15, 1.))
+    find_min()
+#    Chaleur().run_test_case(True, 1e-4)
