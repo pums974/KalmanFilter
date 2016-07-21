@@ -41,7 +41,7 @@ except:
 import math
 import sys
 import time
-
+import timeit
 
 if sys.version_info < (3, ):
     range = xrange
@@ -108,7 +108,7 @@ class Simulation(SkelSimulation):
     This class contains everything for the simulation
     """
     # --------------------------------PARAMETERS--------------------------------
-    cfl = 1. / 4.
+    cfl = 1. / 2.
 
     # ---------------------------------METHODS-----------------------------------
     def __init__(self, _grid, _power, _noiselevel, _dt):
@@ -116,7 +116,7 @@ class Simulation(SkelSimulation):
         # self.dt = min([self.grid.dx**2, self.grid.dy**2]) * self.cfl
         self.dt = _dt
         if min([self.grid.dx**2, self.grid.dy**2]) * self.cfl < self.dt:
-            print("CFL not respected")
+            print("CFL not respected, dt must be < ", min([self.grid.dx**2, self.grid.dy**2]) * self.cfl )
             exit()
 
         SkelSimulation.__init__(self, _noiselevel, self.dt, self.grid.shape)
@@ -353,17 +353,25 @@ class Chaleur(EDP):
         * A filtered simulation
         * how to plot the results
     """
+    name = "Chaleur"
     Lx = 2.
     Ly = 2.
+    power = 1.
+    noise_sim = 0.
+
+#    noise_real = 2e-6
+    noise_real = 2e-5
     nx = 30
     ny = 30
-    power = 1.
-    noise_real = 0.3
-    noise_sim = 0.
-    dt = 0.001
+    dt = 10e-4
     nIt = 50
-    name = "Chaleur"
-
+    
+#    noise_real = 3e-3
+#    nx = 5
+#    ny = 5
+#    dt = 1e-2
+#    nIt = 50
+    
     def __init__(self):
         EDP.__init__(self)
         self.grid = Grid_DF2(self.nx, self.ny, self.Lx, self.Ly)
@@ -491,8 +499,8 @@ class Chaleur(EDP):
 
         # ------------------------ Final output ----------------------------
 
-        print("%8.2e | %8.2e | %8.2e | %8.2e" %
-              (Norm_ref, Err_mes, Err_sim, Err_kal))
+#        print("%8.2e | %8.2e | %8.2e | %8.2e" %
+#              (Norm_ref, Err_mes, Err_sim, Err_kal))
         # Norm_ref = self.grid.norm_inf(Sol_ref)
         # Err_mes = self.grid.norm_inf(Sol_mes)
         # Err_sim = self.grid.norm_inf(Sol_sim)
@@ -503,12 +511,13 @@ class Chaleur(EDP):
 
 
 def do_work(q, r, flag, rank):
+    edp = Chaleur()
     while True:
         try:
             kalnoise = q.get(block=False)
             if flag[0] == 1:
                 # print("Got a job")
-                Norm_ref, Err_mes, Err_sim, Err_kal = Chaleur().run_test_case(False, kalnoise, True)
+                Norm_ref, Err_mes, Err_sim, Err_kal = edp.run_test_case(False, kalnoise, True)
                 # print("job done")
                 r.put(Err_kal)
             # else:
@@ -550,13 +559,13 @@ def find_min():
                 break
         # print("getting the rest")
         compute[0] = 0
+        # print("waiting for process")
+        while max(compute) > 0:
+            pass
         while not res_queue.empty():
             err1 = res_queue.get()
             err += err1
             it += 1
-        # print("waiting for process")
-        while max(compute) > 0:
-            pass
         # print("done")
         err = err / it
         confidence = (maxerr - minerr) / it
@@ -668,10 +677,10 @@ def find_min():
         print("Fin gtf")
 
     def next_val_big_graph():
-        for ns.alpha in [1e-5, 1e-6, 1e-7]:
+        for ns.alpha in [1e-6, 1e-7, 1e-8]:
             start = 0.
-            end = 20. * ns.alpha
-            for it1 in range(2):
+            end = 5. * ns.alpha
+            for it1 in range(3):
                 ns.kalnoise = start
                 err, conf = fx()
                 output = open("data.dat",'a')
@@ -700,7 +709,7 @@ def find_min():
         start = guess * 0.2
         ns.alpha = guess * 0.1
         end = guess * 3
-        for it1 in range(5):
+        for it1 in range(2):
             ns.kalnoise = start
             err, conf = fx()
             output = open("data.dat",'a')
@@ -728,16 +737,19 @@ def find_min():
             end = ns.best_kalnoise * 1.8
         
 
-    edp = Chaleur()
+    edp = Chaleur()   
     print("dx       = %8.2e" % (edp.grid.dx))
     print("dy       = %8.2e" % (edp.grid.dy))
     print("dt       = %8.2e" % (edp.dt))
     print("nr       = %8.2e" % (edp.noise_real))
     print("ns       = %8.2e" % (edp.noise_sim))
+    print("nit      = %8.2e" % (edp.nIt))
 #    guess = 1e-3 + edp.dt**2
 #    guess = -3.6e-4 * np.log(edp.dt) - 1.7e-3
 #    guess = 1.4e-2 * (np.log(edp.dt) + 8.63) * ((edp.grid.dx*edp.grid.dy) ** 3)
-    guess = 6.56e-4
+    guess = 1.36e-2 * (edp.grid.dx*edp.grid.dy) ** 4 + \
+            2.89e-04* edp.dt
+#    guess = edp.grid.dx**6 * edp.dt * 4.
 #    guess = 9e-5
     print("dx*dy*dt = %8.2e" % (guess))
 
@@ -746,7 +758,7 @@ def find_min():
     print("%8.2e | %8.2e | %8.2e | %8.2e" %
           (Norm_ref, Err_mes, Err_sim, Err_kal))
 
-    nproc = 20
+    nproc = 64
     work_queue = Queue()
     res_queue = Queue()
     compute = Array('i', nproc+1)
@@ -767,7 +779,7 @@ def find_min():
 
     ns.best_kalnoise = guess
     ns.best_err = 1e10
-    ns.eps = 2e-3
+    ns.eps = 1e-4
     ns.alpha = guess * 0.25
 
 
@@ -797,33 +809,39 @@ def find_min():
     print("FIN")
 #    print(results_kalnoise)
 #    print(ns.best_err)
-
-
-    data = np.zeros([2,len(ns.kalnoises)])
-    data[0] = ns.kalnoises
-    data[1] = ns.errs
-    data = data[:,data[0,:].argsort()]
-    coef = np.polyfit(data[0][:], data[1][:], 4)[::-1]
-    print("%8.2e x^4 + %8.2e x^3 + %8.2e x^2 + %8.2e x + %8.2e" % 
-          (coef[4], coef[3], coef[2], coef[1], coef[0]))
+        
+    ns.kalnoises = np.array(ns.kalnoises)
+    ns.errs = np.array(ns.errs)
+            
+    x = ns.kalnoises[ns.kalnoises.argsort()]
+    y = ns.errs[ns.kalnoises.argsort()]
+    coef = np.polyfit(x, y, 4)[::-1]
+    for order in range(4, -1, -1):
+        if(order>1):
+            print("%8.2e*x**%1i" % (coef[order], order), end=" + ")
+        elif(order>0):
+            print("%8.2e*x" % (coef[order]), end=" + ")
+        else:
+            print("%8.2e " % (coef[order]))
     polyder = P.polyder(coef)
     polyder2 = P.polyder(coef,2)
     roots = P.polyroots(polyder)
-    ns.eps = ns.eps / 10.
-    ns.best_err = 1e10
+    ns.best_err = 1e100
     for root in roots:
         ns.kalnoise = abs(root.real)
         der2 = P.polyval(ns.kalnoise,polyder2)
-        if der2 > 0:
-            err, conf = fx()
-            if err < ns.best_err:
-                ns.best_err = err
-                ns.best_kalnoise = ns.kalnoise
-            print("%8.2e %8.2e %8.2e" % (ns.kalnoise, err, der2))
-        else:
-            print("%8.2e not a minimum : %8.2e %8.2e" % (ns.kalnoise, P.polyval(ns.kalnoise,coef), der2))
+        err = P.polyval(ns.kalnoise, coef)
+        if err < ns.best_err:
+            ns.best_err = err
+            ns.best_kalnoise = ns.kalnoise
+            
+    ns.kalnoise = ns.best_kalnoise
+    err = ns.best_err
+    ns.eps = ns.eps / 10.
+#    err, conf = fx()
+    print("%8.2e %8.2e %8.2e" % (ns.kalnoise, err, ns.best_err))
     output = open("data.dat",'a')
-    output.write("%.15f  %.15f\n" % (ns.best_kalnoise , ns.best_err))
+    output.write("%.15f  %.15f\n" % (ns.best_kalnoise, err))
     output.close()
 
     compute[0] = -1
@@ -833,5 +851,79 @@ def find_min():
 if __name__ == "__main__":
 #    print(1.+1e-16 -1., test_prec(1., 1e-16, 1.))
 #    print(1.+1e-15 -1., test_prec(1., 1e-15, 1.))
-#    find_min()
-    Chaleur().run_test_case(False, 1e-2, False)
+    find_min()
+#    Chaleur().run_test_case(False, 2.4e-7, False)
+#    print(timeit.timeit('Chaleur().run_test_case(False, 2.4e-7, False)',
+#          setup="from __main__ import Chaleur",
+#          number=10))
+    exit()
+
+
+    def fx():
+        err = 0.
+        minerr = 1e10
+        maxerr = 0.
+        # print("ready to compute ?")
+        compute[0] = 1
+        while max(compute) < 1:
+            pass
+        # print("giving job")
+        for it in range(100):
+            work_queue.put(ns.kalnoise)
+        # print("getting results")
+        for it in range(100000):
+            err1 = res_queue.get()
+            work_queue.put(ns.kalnoise)
+            err += err1
+            minerr = min(minerr, err1)
+            maxerr = max(maxerr, err1)
+            # print(abs(it * err1 / err-1.))
+            # print(err/it, err1, err1 / err)
+            if err1 / err < ns.eps:
+                break
+        # print("getting the rest")
+        compute[0] = 0
+        while not res_queue.empty():
+            err1 = res_queue.get()
+            err += err1
+            it += 1
+        # print("waiting for process")
+        while max(compute) > 0:
+            pass
+        # print("done")
+        err = err / it
+        confidence = (maxerr - minerr) / it
+
+        print(it)
+        return err, confidence
+
+    nproc = 64
+    work_queue = Queue()
+    res_queue = Queue()
+    compute = Array('i', nproc+1)
+    for i in range(nproc+1):
+        compute[i] = 0
+
+    processes = [Process(target=do_work,
+                         args=(work_queue,
+                               res_queue,
+                               compute, i+1))
+                 for i in range(nproc)]
+
+    for p in processes:
+        p.start()
+        
+
+    ns = Namespace()
+
+    ns.kalnoise = 2.4e-7
+    ns.eps = 1e-2
+        
+    print(timeit.timeit('fx()',
+          setup="from __main__ import fx",
+          number=10))
+          
+    compute[0] = -1
+    for p in processes:
+        p.join()
+
