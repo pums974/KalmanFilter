@@ -191,8 +191,8 @@ class Convection(EDP):
     # noise_sim = 0.005
     Lx = 6.
     Ly = 6.
-    nx = 51
-    ny = 51
+    nx = 21
+    ny = 21
     dtheta = 2. * math.pi / 10.
     dt = 0.
     name = "Convection"
@@ -281,13 +281,13 @@ class Convection(EDP):
         self.reinit()
 
         # ----------------- Compute reality and measurement -------------------
-        if graphs:
+        if graphs and False:
             self.animate(self.reality)
         else:
             for it in self.compute(self.reality):
                 pass
         Sol_ref = self.reality.getsol()
-        if graphs:
+        if graphs and False:
             self.animatewithnoise(self.reality)
         Sol_mes = self.reality.getsolwithnoise()
 
@@ -298,7 +298,7 @@ class Convection(EDP):
         self.reality.reinit()
         # Initial solution
         self.simulation.setsol(self.reality.getsol())
-        if graphs:
+        if graphs and False:
             self.animate(self.simulation)
         else:
             for it in self.compute(self.simulation):
@@ -311,7 +311,7 @@ class Convection(EDP):
         # Initial solution
         self.kalman.setsol(self.reality.getsol())
 
-        if graphs:
+        if graphs and False:
             self.animate(self.kalman)
         else:
             for it in self.compute(self.kalman):
