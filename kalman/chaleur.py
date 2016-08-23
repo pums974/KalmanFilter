@@ -101,7 +101,7 @@ class Simulation(SkelSimulation):
     """
     # --------------------------------PARAMETERS--------------------------------
     cfl = 1. / 4.
-    isimplicit = False
+    isimplicit = True
 
     # ---------------------------------METHODS-----------------------------------
     def __init__(self, _grid, _power, _noiselevel, _dt):
@@ -275,7 +275,7 @@ class Simulation(SkelSimulation):
             self.calcbc()
 
 
-class KalmanWrapper(SkelKalmanWrapper):
+class KalmanWrapper(SkelKalmanObservatorWrapper):
     """
         This class is use around the simulation to apply the kalman filter
     """
@@ -284,16 +284,16 @@ class KalmanWrapper(SkelKalmanWrapper):
         SkelKalmanWrapper.__init__(self, _reality, _sim)
         self.size = self.kalsim.size
         _M = self.getwindow()  # Observation matrix.
-        self.kalman = KalmanFilter(self.kalsim, _M)
+        self.kalman = KalmanFilterObservator(self.kalsim, _M)
         indx = self.kalsim.grid.indx
 
-        # Initial covariance estimate.
-        self.kalman.S = np.eye(self.kalman.size_s) * \
-            self.reality.noiselevel ** 2
+#        # Initial covariance estimate.
+#        self.kalman.S = np.eye(self.kalman.size_s) * \
+#            0. ** 2
 
-        # Estimated error in measurements.
-        self.kalman.R = np.eye(self.kalman.size_o) * \
-            self.reality.noiselevel ** 2
+#        # Estimated error in measurements.
+#        self.kalman.R = np.eye(self.kalman.size_o) * \
+#            self.reality.noiselevel ** 2
 
         # Estimated error in process.
         # G = np.zeros([self.kalman.size_s, 1])
@@ -306,8 +306,15 @@ class KalmanWrapper(SkelKalmanWrapper):
         #
         # self.kalman.Q = G.dot(np.transpose(G)) * self.kalsim.noiselevel ** 2
 
-        self.kalman.Q = np.eye(self.kalman.size_s) * \
-            self.kalsim.noiselevel ** 2
+#        self.kalman.Q = np.eye(self.kalman.size_s) * \
+#            self.kalnoise ** 2
+
+        self.kalman.S = np.empty([self.kalman.size_s])
+        self.kalman.R = np.empty([self.kalman.size_o])
+        self.kalman.Q = np.empty([self.kalman.size_s])
+        self.kalman.R.fill(self.reality.noiselevel ** 2)
+        self.kalman.Q.fill(self.reality.noiselevel ** 2)
+            
         gc_clean()
 
     def getwindow(self):
