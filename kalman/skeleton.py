@@ -8,14 +8,14 @@ import random
 import numpy as np
 import sys
 try:
-    from kalman.kalman import KalmanFilter
+    from kalman.kalman import KalmanFilter, KalmanFilterObservator
     from kalman.tools import gc_clean
     if sys.version_info < (3, ):
         from kalman.libs.fortran_libs_py2 import gauss_f
     else:
         from kalman.libs.fortran_libs_py3 import gauss_f
 except:
-    from kalman import KalmanFilter
+    from kalman import KalmanFilter, KalmanFilterObservator
     from tools import gc_clean
     if sys.version_info < (3, ):
         from libs.fortran_libs_py2 import gauss_f
@@ -223,6 +223,76 @@ class SkelKalmanWrapper(object):
         self.kalsim.setsol(self.getsol())
         self.It = self.kalsim.It
 
+
+class SkelKalmanObservatorWrapper(SkelKalmanWrapper):
+    """
+        This class is use around the simulation to apply the kalman filter
+    """
+
+    def __init__(self, _reality, _sim):
+        self.reality = _reality
+        self.kalsim = _sim
+
+        self.It = self.kalsim.It
+        self.nIt = self.kalsim.nIt
+        self.err = self.kalsim.err
+        self.dt = self.kalsim.dt
+        self.size = self.kalsim.size
+
+        _M = self.getwindow()  # Observation matrix.
+        self.kalman = KalmanFilterObservator(self.kalsim, _M)
+        # Initial covariance estimate.
+        self.kalman.S = np.empty([self.kalman.size_s])
+        # Estimated error in measurements.
+        self.kalman.R = np.empty([self.kalman.size_o])
+        self.kalman.R.fill(self.reality.noiselevel ** 2)
+        # Estimated error in process.
+        self.kalman.Q = np.empty([self.kalman.size_s])
+        self.kalman.Q.fill(self.kalsim.noiselevel ** 2)
+        gc_clean()
+
+    def getwindow(self):
+        """
+            Produce the observation matrix : designate what we conserve of the noisy field
+        :return: observation matrix
+        """
+        M = np.eye(self.kalsim.size)
+        return M
+
+    def setmes(self, field):
+        """
+            Reshape noisy field and gives it to the kalman filter
+        :param field:
+        """
+        self.kalman.Y = self.kalman.M.dot(np.reshape(field,
+                                                     self.kalman.size_s))
+
+    def getsol(self):
+        """
+            Extract the solution from kalman filter
+        :return: current solution
+        """
+        return self.kalman.X
+
+    def setsol(self, field):
+        """
+            Set the current solution, for both the simulation and the kalman filter
+        :param field: field
+        """
+        self.kalman.X = field
+        self.kalsim.setsol(field)
+
+    def step(self):
+        """
+            Compute the next step of the simulation and apply kalman filter to the result
+        """
+        self.kalsim.step()
+        self.setsol(self.kalsim.getsol())
+        self.setmes(self.reality.getsolwithnoise())
+        self.kalman.apply()
+        self.kalsim.setsol(self.getsol())
+        self.It = self.kalsim.It
+        
 
 class EDP(object):
     """

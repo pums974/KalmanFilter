@@ -19,19 +19,19 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 try:
-    from kalman.kalman import KalmanFilter
-    from kalman.skeleton import *
-    if sys.version_info < (3, ):
-        from kalman.libs.fortran_libs_py2 import gauss_f
-    else:
-        from kalman.libs.fortran_libs_py3 import gauss_f
-except:
     from kalman import KalmanFilter
     from skeleton import *
     if sys.version_info < (3, ):
         from libs.fortran_libs_py2 import gauss_f
     else:
         from libs.fortran_libs_py3 import gauss_f
+except:
+    from kalman.kalman import KalmanFilter
+    from kalman.skeleton import *
+    if sys.version_info < (3, ):
+        from kalman.libs.fortran_libs_py2 import gauss_f
+    else:
+        from kalman.libs.fortran_libs_py3 import gauss_f
 
 use_fortran = True
 

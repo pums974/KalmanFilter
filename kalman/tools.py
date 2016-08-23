@@ -11,4 +11,5 @@ def gc_clean():
         Clean some memory
     :return:
     """
-    n = gc.collect()
+    # n = gc.collect()
+    pass
