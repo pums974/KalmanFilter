@@ -25,9 +25,9 @@ try:
     from kalman.grid import Grid_DF2
     from kalman.tools import gc_clean
     if sys.version_info < (3, ):
-        from kalman.libs.fortran_libs_py2 import test_prec
+        from kalman.libs.fortran_libs_py2 import test_prec,inv
     else:
-        from kalman.libs.fortran_libs_py3 import test_prec
+        from kalman.libs.fortran_libs_py3 import test_prec,inv
     
 except:
     from kalman import KalmanFilter, KalmanFilterObservator
@@ -35,9 +35,9 @@ except:
     from grid import Grid_DF2
     from tools import gc_clean
     if sys.version_info < (3, ):
-        from libs.fortran_libs_py2 import test_prec
+        from libs.fortran_libs_py2 import test_prec,inv
     else:
-        from libs.fortran_libs_py3 import test_prec
+        from libs.fortran_libs_py3 import test_prec,inv
 import math
 import sys
 import time
@@ -109,27 +109,32 @@ class Simulation(SkelSimulation):
     """
     # --------------------------------PARAMETERS--------------------------------
     cfl = 1. / 2.
+    isimplicit = False
 
     # ---------------------------------METHODS-----------------------------------
     def __init__(self, _grid, _power, _noiselevel, _dt):
         self.grid = _grid
         # self.dt = min([self.grid.dx**2, self.grid.dy**2]) * self.cfl
         self.dt = _dt
-        if min([self.grid.dx**2, self.grid.dy**2]) * self.cfl < self.dt:
-            print("CFL not respected, dt must be < ", min([self.grid.dx**2, self.grid.dy**2]) * self.cfl )
-            exit()
+#        if min([self.grid.dx**2, self.grid.dy**2]) * self.cfl < self.dt:
+#            print("CFL not respected, dt must be < ", min([self.grid.dx**2, self.grid.dy**2]) * self.cfl )
+#            exit()
 
         SkelSimulation.__init__(self, _noiselevel, self.dt, self.grid.shape)
         self.power = _power
 
         # compute matrix
         self.calcmat()
+        self.calcmatbc()
+        self.Mat = self.Mat.transpose()
 
         # rhs and boundary conditions
-        self.calcmatbc()
-
         self.field = np.zeros([self.size])
         self.calcbc()
+        
+        if self.isimplicit:
+#            self.Mat = np.linalg.inv(self.Mat)
+            self.Mat = inv(self.Mat)
         gc_clean()
 
     def calcmat(self):
@@ -142,16 +147,19 @@ class Simulation(SkelSimulation):
         ny = self.grid.ny
         # time
         self.Mat = np.eye(self.size, self.size)
+        if self.isimplicit:
+            coef = -self.dt
+        else:
+            coef = self.dt
         # Laplacien
         for i in range(nx):
             for j in range(ny):
                 self.field = np.zeros([nx, ny])
-                self.field[i, j] = self.dt
+                self.field[i, j] = coef
                 self.Mat[indx(i, j)] += np.reshape(
                     self.grid.dderx(self.field), [self.size])
                 self.Mat[indx(i, j)] += np.reshape(
                     self.grid.ddery(self.field), [self.size])
-        self.Mat = self.Mat.transpose()
 
     def calcmatbc(self):
         """
@@ -162,22 +170,43 @@ class Simulation(SkelSimulation):
         nx = self.grid.nx
         ny = self.grid.ny
 
-        def zeroing(_i, _j):
+        def dirichlet(_i, _j):
             """
-                Set the line corresponding to the point i,j to 0 except on the diagonal
+                Impose a Dirichlet boundary condition
             :param _i:
             :param _j:
+            :param val:
             :return:
             """
             self.Mat[indx(_i, _j)] = np.zeros([self.size])
             self.Mat[indx(_i, _j)][indx(_i, _j)] = 1.
 
+        def neumann(_i, _j, _dir):
+            """
+                Impose a neumann boundary condition
+            :param _i:
+            :param _j:
+            :param val:
+            :return:
+            """
+            self.field = np.zeros([nx, ny])
+            self.field[_i, _j] = 1.
+            if dir == 'x':
+            	self.Mat[indx(_i, _j)] = np.reshape(
+                	    self.grid.derx(self.field), [self.size])
+            if dir == 'y':
+            	self.Mat[indx(_i, _j)] = np.reshape(
+                	    self.grid.dery(self.field), [self.size])
+
         for i in range(nx):
-            zeroing(i, 0)
-            zeroing(i, ny - 1)
+            dirichlet(i, 0)
+            if self.isimplicit:
+                neumann(i, ny - 1, 'y')
+            else:
+                dirichlet(i, ny - 1)
         for j in range(ny):
-            zeroing(0, j)
-            zeroing(nx - 1, j)
+            dirichlet(0, j)
+            dirichlet(nx - 1, j)
 
     def calcbc(self):
         """
@@ -227,12 +256,13 @@ class Simulation(SkelSimulation):
 
         for i in range(nx):
             dirichlet(i, 0, 0.)
-            # dirichlet(i, ny - 1, 1.)
-            neumann(i, ny - 1, 0., np.array([0, -1]))
+            if self.isimplicit:
+                dirichlet(i, ny - 1, 0.)
+            else:
+                neumann(i, ny - 1, 0., np.array([0, -1]))
         for j in range(ny):
             dirichlet(0, j, 0.)
             dirichlet(nx - 1, j, 0.)
-            # neumann(nx - 1, j, 1., 0)
 
     def getsol(self):
         """
@@ -254,8 +284,11 @@ class Simulation(SkelSimulation):
         """
         power = 0.  # np.random.normal(self.power, self.noiselevel, self.rhs.shape)
         self.rhs = np.zeros([self.size]) + power
+        if self.isimplicit:
+            self.calcbc()
         SkelSimulation.step(self)
-        self.calcbc()
+        if not self.isimplicit:        
+            self.calcbc()
 
 
 class KalmanWrapper(SkelKalmanObservatorWrapper):
@@ -360,10 +393,10 @@ class Chaleur(EDP):
     noise_sim = 0.
 
 #    noise_real = 2e-6
-    noise_real = 2e-5
+    noise_real = 3e-4
     nx = 30
     ny = 30
-    dt = 10e-4
+    dt = 1e-6
     nIt = 50
     
 #    noise_real = 3e-3
@@ -729,7 +762,7 @@ def find_min():
                 output.close()
                 yield ns.kalnoise, err, conf
                 if err < ns.best_err:
-                    print("%8.2e  %8.2e" % (ns.kalnoise, err))
+                    print("%8.2e  %8.2e  %8.2e" % (ns.kalnoise, err, ns.ref/err))
                     ns.best_kalnoise = ns.kalnoise
                     ns.best_err = err
             start = ns.best_kalnoise * 0.2
@@ -744,14 +777,15 @@ def find_min():
     print("nr       = %8.2e" % (edp.noise_real))
     print("ns       = %8.2e" % (edp.noise_sim))
     print("nit      = %8.2e" % (edp.nIt))
-#    guess = 1e-3 + edp.dt**2
-#    guess = -3.6e-4 * np.log(edp.dt) - 1.7e-3
-#    guess = 1.4e-2 * (np.log(edp.dt) + 8.63) * ((edp.grid.dx*edp.grid.dy) ** 3)
-    guess = 1.36e-2 * (edp.grid.dx*edp.grid.dy) ** 4 + \
-            2.89e-04* edp.dt
-#    guess = edp.grid.dx**6 * edp.dt * 4.
-#    guess = 9e-5
-    print("dx*dy*dt = %8.2e" % (guess))
+    print("cfl      = %8.2e" % (max([edp.dt / (edp.grid.dx**2), edp.dt / (edp.grid.dy**2)])))
+    
+    # cas explicite (pas sûr pour le temps)
+    guess = 1.03e-2 * (edp.grid.dx**4 + edp.grid.dy** 4) + \
+            2.69e-01* edp.dt**2
+            
+#    guess = guess /10
+            
+    print("alpha * (dx**4 + dy**4 ) + beta * dt**2 = %8.2e" % (guess))
 
     Norm_ref, Err_mes, Err_sim, Err_kal = edp.run_test_case(False, guess, False)
     print("Norme H1 |  reality |   simu   |  kalman")
@@ -777,9 +811,10 @@ def find_min():
 
     ns = Namespace()
 
+    ns.ref = Err_sim
     ns.best_kalnoise = guess
     ns.best_err = 1e10
-    ns.eps = 1e-4
+    ns.eps = 1e-2
     ns.alpha = guess * 0.25
 
 

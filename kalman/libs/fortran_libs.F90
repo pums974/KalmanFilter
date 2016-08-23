@@ -271,7 +271,7 @@ subroutine kalman_apply_f(Phi, S1, Q, M, R, Y, X1,s,x,n1,n2)
 
 
       ! ---------------------------Update step-------------------------------
-      innovation_covariance0 = inv(innovation_covariance)
+      call inv(innovation_covariance, innovation_covariance0,n2)
 !      k = matmul(s,matmul(transpose(m),innovation_covariance))
       k = transpose(M)
       k0 = matmul(k,innovation_covariance0)
@@ -402,24 +402,24 @@ implicit none
                        
 end function matmul
 
+end subroutine kalman_apply_f
+
 ! Returns the inverse of a matrix calculated by finding the LU
 ! decomposition.  Depends on LAPACK.
-function inv(A) result(Ainv)
+subroutine inv(A,Ainv,n)
 implicit none
-  double precision, dimension(:,:), intent(in) :: A
-  double precision, allocatable :: Ainv(:,:)
+  integer,intent(in) :: n
+  double precision, dimension(n,n), intent(in) :: A
+  double precision, dimension(n,n), intent(out) :: Ainv
 
   double precision, allocatable :: work(:)  ! work array for LAPACK
   integer, allocatable :: ipiv(:)   ! pivot indices
-  integer :: n, info
+  integer :: info
 
-
-  allocate(Ainv(size(A,1),size(A,2)),work(size(A,1)),ipiv(size(A,1)))
-
+  allocate(work(n),ipiv(n))
 
   ! Store A in Ainv to prevent it from being overwritten by LAPACK
   Ainv = A
-  n = size(A,1)
 
   ! DGETRF computes an LU factorization of a general M-by-N matrix A
   ! using partial pivoting with row interchanges.
@@ -438,9 +438,7 @@ implicit none
   end if
   
   deallocate(work,ipiv)
-end function inv
-
-end subroutine kalman_apply_f
+end subroutine inv
 
 subroutine gauss_f(mu, dev, out, n)
 use iso_fortran_env, only: int64
