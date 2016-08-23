@@ -203,6 +203,37 @@ endif
    
 end subroutine dery_upwind_f
 
+subroutine kalman_apply_obs_f(Phi, S1, Q, R, Y, X1,s,x,n1)
+  implicit none
+  integer,intent(in) :: n1
+  double precision,intent(in) :: Phi(n1), R(n1), Q(n1), Y(n1)
+  double precision ,intent(in):: S1(n1),X1(n1)
+  double precision,intent(out):: S(n1),X(n1)
+
+  double precision :: innovation_covariance , innovation, k
+  integer :: i,INFO
+
+  do i = 1,n1
+    
+    ! -------------------------Prediction step-----------------------------
+    S(i) = Phi(i)*S1(i)*Phi(i) + Q(i)
+
+    ! ------------------------Observation step-----------------------------
+    innovation_covariance = S(i) + R(i)
+    innovation = Y(i) - X1(i)
+
+
+    ! ---------------------------Update step-------------------------------
+    K = S(i) / innovation_covariance
+    
+    x(i) = x1(i) + k * innovation
+    
+    s(i) = (1.-k) * s(i)
+  enddo
+  
+end subroutine kalman_apply_obs_f
+
+
 subroutine kalman_apply_f(Phi, S1, Q, M, R, Y, X1,s,x,n1,n2)
   implicit none
   integer,intent(in) :: n1,n2
@@ -240,7 +271,7 @@ subroutine kalman_apply_f(Phi, S1, Q, M, R, Y, X1,s,x,n1,n2)
 
 
       ! ---------------------------Update step-------------------------------
-      innovation_covariance0 = inv(innovation_covariance)
+      call inv(innovation_covariance, innovation_covariance0,n2)
 !      k = matmul(s,matmul(transpose(m),innovation_covariance))
       k = transpose(M)
       k0 = matmul(k,innovation_covariance0)
@@ -371,24 +402,24 @@ implicit none
                        
 end function matmul
 
+end subroutine kalman_apply_f
+
 ! Returns the inverse of a matrix calculated by finding the LU
 ! decomposition.  Depends on LAPACK.
-function inv(A) result(Ainv)
+subroutine inv(A,Ainv,n)
 implicit none
-  double precision, dimension(:,:), intent(in) :: A
-  double precision, allocatable :: Ainv(:,:)
+  integer,intent(in) :: n
+  double precision, dimension(n,n), intent(in) :: A
+  double precision, dimension(n,n), intent(out) :: Ainv
 
   double precision, allocatable :: work(:)  ! work array for LAPACK
   integer, allocatable :: ipiv(:)   ! pivot indices
-  integer :: n, info
+  integer :: info
 
-
-  allocate(Ainv(size(A,1),size(A,2)),work(size(A,1)),ipiv(size(A,1)))
-
+  allocate(work(n),ipiv(n))
 
   ! Store A in Ainv to prevent it from being overwritten by LAPACK
   Ainv = A
-  n = size(A,1)
 
   ! DGETRF computes an LU factorization of a general M-by-N matrix A
   ! using partial pivoting with row interchanges.
@@ -407,11 +438,10 @@ implicit none
   end if
   
   deallocate(work,ipiv)
-end function inv
-
-end subroutine kalman_apply_f
+end subroutine inv
 
 subroutine gauss_f(mu, dev, out, n)
+use iso_fortran_env, only: int64
 #ifdef __INTEL_COMPILER
 use IFPORT
 #endif
@@ -424,10 +454,14 @@ implicit none
   double precision,allocatable :: x2pi(:),g2rad(:)
   logical,save :: init = .false.
 !  integer,parameter :: myseed = 86456
-  integer :: m,i, un, istat, pid
-  integer :: myseed
-
+  integer :: m,i, un, istat, pid,nseed
+  integer,allocatable :: myseed(:)
+  integer(int64) :: t
+            
   if(.not.init) then
+    call random_seed(size = nseed)
+    allocate(myseed(nseed))
+    
     ! First try if the OS provides a random number generator
     open(newunit=un, file="/dev/urandom", access="stream", &
          form="unformatted", action="read", status="old", iostat=istat)
@@ -438,22 +472,25 @@ implicit none
        ! Fallback to XOR:ing the current time and pid. The PID is
        ! useful in case one launches multiple instances of the same
        ! program in parallel.
-       call system_clock(myseed)
-       if (myseed == 0) myseed = 86456
+       call system_clock(t)
+       if (t == 0) myseed = 86456
        pid = getpid()
-       myseed = ieor(myseed, int(pid, kind(myseed)))
+       myseed = int(ieor(t, int(pid, kind(t))),kind(myseed))
     end if
   
-     myseed = 86456
-     call srand(myseed)
+!     myseed = 86456
+     call random_seed(put=myseed)
+     deallocate(myseed)
      init = .true.
   endif
 
     m = ceiling(n/2.)
     allocate(x2pi(m),g2rad(m))
+      call RANDOM_NUMBER(x2pi)
+      call RANDOM_NUMBER(g2rad)
       do i = 1,m
-        x2pi(i) = rand() * TWOPI
-        g2rad(i) = sqrt(-2.d0 * log(1.d0 - rand()))
+        x2pi(i) = x2pi(i) * TWOPI
+        g2rad(i) = sqrt(-2.d0 * log(1.d0 - g2rad(i)))
       enddo
       do i = 1,size(mu),2
         out(i) = mu(i) + cos(x2pi(ceiling(i/2.))) * g2rad(ceiling(i/2.)) * dev
@@ -463,7 +500,9 @@ implicit none
       enddo
       deallocate(x2pi,g2rad)
 end subroutine gauss_f
+
 subroutine gauss_f2(reinit, done)
+use iso_fortran_env, only: int64
 #ifdef __INTEL_COMPILER
 use IFPORT
 #endif
@@ -471,15 +510,19 @@ implicit none
   logical,save :: init = .false.
   integer, intent(in) :: reinit
 !  integer,parameter :: myseed = 86456
-  integer :: m,i, un, istat, pid
-  integer :: myseed
+  integer :: m,i, un, istat, pid,nseed
+  integer,allocatable :: myseed(:)
   integer,intent(out) :: done
+  integer(int64) :: t
   done = 0
   if (reinit>0) then
     init = .false.
   endif
       
   if(.not.init) then
+    call random_seed(size = nseed)
+    allocate(myseed(nseed))
+    
     ! First try if the OS provides a random number generator
     open(newunit=un, file="/dev/urandom", access="stream", &
          form="unformatted", action="read", status="old", iostat=istat)
@@ -490,15 +533,15 @@ implicit none
        ! Fallback to XOR:ing the current time and pid. The PID is
        ! useful in case one launches multiple instances of the same
        ! program in parallel.
-       call system_clock(myseed)
-       if (myseed == 0) myseed = 86456
+       call system_clock(t)
+       if (t == 0) myseed = 86456
        pid = getpid()
-       myseed = ieor(myseed, int(pid, kind(myseed)))
+       myseed = int(ieor(t, int(pid, kind(t))),kind(myseed))
     end if
   
-     myseed = 86456
-  
-     call srand(myseed)
+!     myseed = 86456
+     call random_seed(put=myseed)
+     deallocate(myseed)
      init = .true.
   endif
   done=1
@@ -520,9 +563,7 @@ implicit none
 
 
   if(typ>0) then
-    do i=1,6
-      rand_val(i) = rand()
-    enddo
+    call RANDOM_NUMBER(rand_val)
   endif
   
   select case(typ)
