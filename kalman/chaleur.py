@@ -108,17 +108,14 @@ class Simulation(SkelSimulation):
     This class contains everything for the simulation
     """
     # --------------------------------PARAMETERS--------------------------------
-    cfl = 1. / 2.
-    isimplicit = False
+    cfl = 1. / 4.
+    isimplicit = True
 
     # ---------------------------------METHODS-----------------------------------
     def __init__(self, _grid, _power, _noiselevel, _dt):
         self.grid = _grid
         # self.dt = min([self.grid.dx**2, self.grid.dy**2]) * self.cfl
         self.dt = _dt
-#        if min([self.grid.dx**2, self.grid.dy**2]) * self.cfl < self.dt:
-#            print("CFL not respected, dt must be < ", min([self.grid.dx**2, self.grid.dy**2]) * self.cfl )
-#            exit()
 
         SkelSimulation.__init__(self, _noiselevel, self.dt, self.grid.shape)
         self.power = _power
@@ -126,7 +123,6 @@ class Simulation(SkelSimulation):
         # compute matrix
         self.calcmat()
         self.calcmatbc()
-        self.Mat = self.Mat.transpose()
 
         # rhs and boundary conditions
         self.field = np.zeros([self.size])
@@ -160,6 +156,7 @@ class Simulation(SkelSimulation):
                     self.grid.dderx(self.field), [self.size])
                 self.Mat[indx(i, j)] += np.reshape(
                     self.grid.ddery(self.field), [self.size])
+        self.Mat = self.Mat.transpose()
 
     def calcmatbc(self):
         """
@@ -256,10 +253,7 @@ class Simulation(SkelSimulation):
 
         for i in range(nx):
             dirichlet(i, 0, 0.)
-            if self.isimplicit:
-                dirichlet(i, ny - 1, 0.)
-            else:
-                neumann(i, ny - 1, 0., np.array([0, -1]))
+            neumann(i, ny - 1, 0., np.array([0, -1]))
         for j in range(ny):
             dirichlet(0, j, 0.)
             dirichlet(nx - 1, j, 0.)
@@ -284,8 +278,6 @@ class Simulation(SkelSimulation):
         """
         power = 0.  # np.random.normal(self.power, self.noiselevel, self.rhs.shape)
         self.rhs = np.zeros([self.size]) + power
-        if self.isimplicit:
-            self.calcbc()
         SkelSimulation.step(self)
         if not self.isimplicit:        
             self.calcbc()
@@ -474,7 +466,7 @@ class Chaleur(EDP):
         """
         self.grid.animatewithnoise(simu, self.compute, self.norm)
 
-    def run_test_case(self, graphs, _kalnoise, kalonly):
+    def run_test_case(self, graphs, _kalnoise, kalonly=False):
         """
             Run the test case
         :return:

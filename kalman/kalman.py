@@ -6,19 +6,19 @@
 from __future__ import print_function, absolute_import
 import numpy as np
 import sys
-#import matplotlib.pyplot as plt
+import matplotlib.pyplot as plt
 try:
-    from kalman.tools import gc_clean
-    if sys.version_info < (3, ):
-        from kalman.libs.fortran_libs_py2 import kalman_apply_f, kalman_apply_obs_f
-    else:
-        from kalman.libs.fortran_libs_py3 import kalman_apply_f, kalman_apply_obs_f
-except:
     from tools import gc_clean
     if sys.version_info < (3, ):
         from libs.fortran_libs_py2 import kalman_apply_f, kalman_apply_obs_f
     else:
         from libs.fortran_libs_py3 import kalman_apply_f, kalman_apply_obs_f
+except:
+    from kalman.tools import gc_clean
+    if sys.version_info < (3, ):
+        from kalman.libs.fortran_libs_py2 import kalman_apply_f, kalman_apply_obs_f
+    else:
+        from kalman.libs.fortran_libs_py3 import kalman_apply_f, kalman_apply_obs_f
 
 use_fortran = True
 
