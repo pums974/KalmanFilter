@@ -16,15 +16,24 @@ from __future__ import print_function, absolute_import
 import numpy as np
 import matplotlib.pyplot as plt
 try:
-    from kalman.kalman import KalmanFilter
+    from kalman.kalman import KalmanFilter, KalmanFilterObservator
     from kalman.skeleton import *
     from kalman.grid import Grid_DF2
     from kalman.tools import gc_clean
+    if sys.version_info < (3, ):
+        from kalman.libs.fortran_libs_py2 import inv
+    else:
+        from kalman.libs.fortran_libs_py3 import inv
+    
 except:
-    from kalman import KalmanFilter
+    from kalman import KalmanFilter, KalmanFilterObservator
     from skeleton import *
     from grid import Grid_DF2
     from tools import gc_clean
+    if sys.version_info < (3, ):
+        from libs.fortran_libs_py2 import inv
+    else:
+        from libs.fortran_libs_py3 import inv
 import math
 import sys
 
@@ -92,23 +101,28 @@ class Simulation(SkelSimulation):
     """
     # --------------------------------PARAMETERS--------------------------------
     cfl = 1. / 4.
+    isimplicit = False
 
     # ---------------------------------METHODS-----------------------------------
-    def __init__(self, _grid, _power, _noiselevel):
+    def __init__(self, _grid, _power, _noiselevel, _dt):
         self.grid = _grid
-        self.dt = min([self.grid.dx**2, self.grid.dy**2]) * self.cfl
+        # self.dt = min([self.grid.dx**2, self.grid.dy**2]) * self.cfl
+        self.dt = _dt
 
         SkelSimulation.__init__(self, _noiselevel, self.dt, self.grid.shape)
         self.power = _power
 
         # compute matrix
         self.calcmat()
-
-        # rhs and boundary conditions
         self.calcmatbc()
 
+        # rhs and boundary conditions
         self.field = np.zeros([self.size])
         self.calcbc()
+        
+        if self.isimplicit:
+#            self.Mat = np.linalg.inv(self.Mat)
+            self.Mat = inv(self.Mat)
         gc_clean()
 
     def calcmat(self):
@@ -121,11 +135,15 @@ class Simulation(SkelSimulation):
         ny = self.grid.ny
         # time
         self.Mat = np.eye(self.size, self.size)
+        if self.isimplicit:
+            coef = -self.dt
+        else:
+            coef = self.dt
         # Laplacien
         for i in range(nx):
             for j in range(ny):
                 self.field = np.zeros([nx, ny])
-                self.field[i, j] = self.dt
+                self.field[i, j] = coef
                 self.Mat[indx(i, j)] += np.reshape(
                     self.grid.dderx(self.field), [self.size])
                 self.Mat[indx(i, j)] += np.reshape(
@@ -141,22 +159,43 @@ class Simulation(SkelSimulation):
         nx = self.grid.nx
         ny = self.grid.ny
 
-        def zeroing(_i, _j):
+        def dirichlet(_i, _j):
             """
-                Set the line corresponding to the point i,j to 0 except on the diagonal
+                Impose a Dirichlet boundary condition
             :param _i:
             :param _j:
+            :param val:
             :return:
             """
             self.Mat[indx(_i, _j)] = np.zeros([self.size])
             self.Mat[indx(_i, _j)][indx(_i, _j)] = 1.
 
+        def neumann(_i, _j, _dir):
+            """
+                Impose a neumann boundary condition
+            :param _i:
+            :param _j:
+            :param val:
+            :return:
+            """
+            self.field = np.zeros([nx, ny])
+            self.field[_i, _j] = 1.
+            if dir == 'x':
+            	self.Mat[indx(_i, _j)] = np.reshape(
+                	    self.grid.derx(self.field), [self.size])
+            if dir == 'y':
+            	self.Mat[indx(_i, _j)] = np.reshape(
+                	    self.grid.dery(self.field), [self.size])
+
         for i in range(nx):
-            zeroing(i, 0)
-            zeroing(i, ny - 1)
+            dirichlet(i, 0)
+            if self.isimplicit:
+                neumann(i, ny - 1, 'y')
+            else:
+                dirichlet(i, ny - 1)
         for j in range(ny):
-            zeroing(0, j)
-            zeroing(nx - 1, j)
+            dirichlet(0, j)
+            dirichlet(nx - 1, j)
 
     def calcbc(self):
         """
@@ -206,12 +245,10 @@ class Simulation(SkelSimulation):
 
         for i in range(nx):
             dirichlet(i, 0, 0.)
-            # dirichlet(i, ny - 1, 1.)
             neumann(i, ny - 1, 0., np.array([0, -1]))
         for j in range(ny):
             dirichlet(0, j, 0.)
             dirichlet(nx - 1, j, 0.)
-            # neumann(nx - 1, j, 1., 0)
 
     def getsol(self):
         """
@@ -234,7 +271,8 @@ class Simulation(SkelSimulation):
         power = 0.  # np.random.normal(self.power, self.noiselevel, self.rhs.shape)
         self.rhs = np.zeros([self.size]) + power
         SkelSimulation.step(self)
-        self.calcbc()
+        if not self.isimplicit:        
+            self.calcbc()
 
 
 class KalmanWrapper(SkelKalmanWrapper):
@@ -324,16 +362,17 @@ class Chaleur(EDP):
         * A filtered simulation
         * how to plot the results
     """
+    name = "Chaleur"
     Lx = 2.
     Ly = 3.
+    power = 1.
+    noise_sim = 0.01
+
+    noise_real = 0.01
     nx = 20
     ny = 20
-    power = 1.
-    noise_real = 0.01
-    noise_sim = 0.01
-    dt = 0.
+    dt = 2.7e-3
     nIt = 150
-    name = "Chaleur"
 
     def __init__(self):
         EDP.__init__(self)
@@ -353,8 +392,8 @@ class Chaleur(EDP):
             Reinit everything
         :return:
         """
-        self.simulation = Simulation(self.grid, 0., self.noise_sim)
-        self.kalsim = Simulation(self.grid, 0., self.noise_sim)
+        self.simulation = Simulation(self.grid, 0., self.noise_sim, self.dt)
+        self.kalsim = Simulation(self.grid, 0., self.noise_sim, self.dt)
 
         self.dt = self.simulation.dt
         self.reality = Reality(self.grid, self.power, self.noise_real, self.dt)
@@ -381,7 +420,7 @@ class Chaleur(EDP):
         :param field: field
         :return: norm H1
         """
-        return self.grid.norm_inf(field)
+        return self.grid.norm_h1(field)
 
     def plot(self, field):
         """
@@ -404,12 +443,17 @@ class Chaleur(EDP):
         """
         self.grid.animatewithnoise(simu, self.compute, self.norm)
 
-    def run_test_case(self, graphs):
+    def run_test_case(self, graphs, kalonly=False):
         """
             Run the test case
         :return:
         """
         self.reinit()
+
+        Norm_ref = 1.
+        Err_mes = -1.
+        Err_sim = -1.
+        Err_kal = -1.
 
         # ----------------- Compute reality and measurement -------------------
         if graphs:
@@ -417,36 +461,41 @@ class Chaleur(EDP):
         else:
             for it in self.compute(self.reality):
                 pass
-        Sol_ref = self.reality.getsol()
-        if graphs:
-            self.animatewithnoise(self.reality)
-        Sol_mes = self.reality.getsolwithnoise()
 
-        Norm_ref = self.norm(Sol_ref)
-        Err_mes = self.norm(Sol_ref - Sol_mes) / Norm_ref
+        if not kalonly:
+            if graphs:
+                self.animatewithnoise(self.reality)
 
-        # ------------------------ Compute simulation without Kalman ----------
-        self.reality.reinit()
-        # Initial solution
-        self.simulation.setsol(self.reality.getsolwithnoise())
-        if graphs:
-            self.animate(self.simulation)
-        else:
-            for it in self.compute(self.simulation):
-                pass
-        Sol_sim = self.simulation.getsol()
-        Err_sim = self.norm(Sol_ref - Sol_sim) / Norm_ref
+        if not kalonly:
+            # ------------------------ Compute simulation without Kalman ----------
+            self.reality.reinit()
+            # Initial solution
+            self.simulation.setsol(self.reality.getsol())
+            if graphs:
+                self.animate(self.simulation)
+            else:
+                for it in self.compute(self.simulation):
+                    pass
 
         # ------------------------ Compute simulation with Kalman -------------
         self.reality.reinit()
         # Initial solution
-        self.kalman.setsol(self.reality.getsolwithnoise())
+        self.kalman.setsol(self.reality.getsol())
 
         if graphs:
             self.animate(self.kalman)
         else:
             for it in self.compute(self.kalman):
                 pass
+                
+        Sol_ref = self.reality.getsol()
+        Norm_ref = self.norm(Sol_ref)
+        if not kalonly:
+            Sol_mes = self.reality.getsolwithnoise()
+            Err_mes = self.norm(Sol_ref - Sol_mes) / Norm_ref
+            Sol_sim = self.simulation.getsol()
+            Err_sim = self.norm(Sol_ref - Sol_sim) / Norm_ref
+            
         Sol_kal = self.kalman.getsol()
         Err_kal = self.norm(Sol_ref - Sol_kal) / Norm_ref
 
