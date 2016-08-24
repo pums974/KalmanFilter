@@ -384,10 +384,10 @@ class Chaleur(EDP):
     power = 1.
     noise_sim = 0.
 
-#    noise_real = 2e-6
-    noise_real = 3e-4
-    nx = 30
-    ny = 30
+    noise_real = 1e-8
+#    noise_real = 3e-4
+    nx = 40
+    ny = 40
     dt = 1e-6
     nIt = 50
     
@@ -572,16 +572,17 @@ def find_min():
         for it in range(100):
             work_queue.put(ns.kalnoise)
         # print("getting results")
-        for it in range(100000):
+        for it in range(1, 100000):
             err1 = res_queue.get()
             work_queue.put(ns.kalnoise)
-            err += err1
-            minerr = min(minerr, err1)
-            maxerr = max(maxerr, err1)
-            # print(abs(it * err1 / err-1.))
-            # print(err/it, err1, err1 / err)
-            if err1 / err < ns.eps:
-                break
+            if err1 < 100*err or it == 1:
+              err += err1
+              minerr = min(minerr, err1)
+              maxerr = max(maxerr, err1)
+              # print(abs(it * err1 / err-1.))
+              # print(err/it, err1, err1 / err)
+              if err1 / err < ns.eps:
+                  break
         # print("getting the rest")
         compute[0] = 0
         # print("waiting for process")
@@ -772,10 +773,12 @@ def find_min():
     print("cfl      = %8.2e" % (max([edp.dt / (edp.grid.dx**2), edp.dt / (edp.grid.dy**2)])))
     
     # cas explicite (pas sûr pour le temps)
-    guess = 1.03e-2 * (edp.grid.dx**4 + edp.grid.dy** 4) + \
-            2.69e-01* edp.dt**2
+#    guess = 4.50E-03 * (edp.grid.dx**4 + edp.grid.dy** 4) + \
+#            2.69e-01* edp.dt**2
             
-#    guess = guess /10
+    # cas implicite
+    guess = 2.E-05 * (edp.grid.dx**4 + edp.grid.dy** 4) + \
+            4.5E+02* edp.dt**2
             
     print("alpha * (dx**4 + dy**4 ) + beta * dt**2 = %8.2e" % (guess))
 
