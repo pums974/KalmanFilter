@@ -94,7 +94,7 @@ class Grid(object):
         :param field: field
         :return: norm
         """
-        return np.sqrt(np.sum(np.square(field)))
+        return np.sqrt(np.sum(np.square(field)*self.dx*self.dy))
 
     def norm_h1(self, field):
         """
@@ -105,8 +105,8 @@ class Grid(object):
         """
         dx = self.derx(field)
         dy = self.dery(field)
-        return np.sqrt(np.sum(np.square(field)) + np.sum(np.square(dx)) +
-                       np.sum(np.square(dy)))
+        return np.sqrt(self.norm_l2(field) ** 2 +
+                       self.norm_l2(dx) ** 2 + self.norm_l2(dy) ** 2)
 
     def norm_inf(self, field):
         """

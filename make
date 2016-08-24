@@ -1,4 +1,4 @@
-#!/usr/bin/bash
+#!/bin/bash
 echo "Cleaning : rm *~ *.pyc __pycache__ *.so"
 find . \( -name "*.~" -o -name "*.pyc" -o -name "*.so" \) -exec ls -l {} \; -exec rm -r {} \;
 
