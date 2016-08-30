@@ -380,12 +380,12 @@ class Chaleur(EDP):
     power = 1.
     
     noise_sim = 0.
-    noise_real = 1e-8
+    noise_real = 6e-4
     
-    nx = 40
-    ny = 40
-    dt = 1e-6
-    nIt = 50
+    nx = 20
+    ny = 20
+    dt = 1.5e-3
+    nIt = 100
     
 #    noise_real = 3e-3
 #    nx = 5
@@ -413,7 +413,7 @@ class Chaleur(EDP):
         self.grid.coordy += self.grid.Ly / 2.
         
 #        self.dt = min([self.grid.dx**2, self.grid.dy**2]) / 4.
-        self.nIt = int(0.5/self.dt)
+#        self.nIt = int(1e-3/self.dt)
         self.simulation = Simulation(self.grid, 0., self.noise_sim, self.dt)
         self.kalsim = Simulation(self.grid, 0., self.noise_sim, self.dt)
 
@@ -776,8 +776,7 @@ def find_min():
 #            2.69e-01* edp.dt**2
             
     # cas implicite
-    guess = 2.E-05 * (edp.grid.dx**4 + edp.grid.dy** 4) + \
-            4.5E+02* edp.dt**2
+    guess = 2.7e-4
             
     print("alpha * (dx**4 + dy**4 ) + beta * dt**2 = %8.2e" % (guess))
 
