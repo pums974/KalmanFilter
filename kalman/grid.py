@@ -165,7 +165,7 @@ class Grid(object):
             ax.set_ylim(self.coordy[1, 1],
                         self.coordy[self.nx - 1, self.ny - 1])
             ax.set_zlim(0, 1)
-            ax.set_title('It = ' + str(i) + ',\n err = ' + str(simu.err))
+            ax.set_title('It = ' + str(i) + ',\n err = ' + str(simu.err/i))
             return surf,
 
         fig = plt.figure()
