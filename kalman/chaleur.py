@@ -53,46 +53,26 @@ class Reality(SkelReality):
         self.grid = _grid
         SkelReality.__init__(self, _noiselevel, _dt, _grid.shape)
         self.power = _power
-        c1 = 16 * _power / (math.pi**2)
-        c2 = math.pi / self.grid.Lx
-        c3 = 0.5 * math.pi / self.grid.Ly
-        c4 = math.pi * math.pi / (4. * self.grid.Ly**2)
-        c5 = math.pi * math.pi / (self.grid.Lx**2)
-        add = np.zeros([self.grid.nx, self.grid.ny])
-        self.nmode = 1
-        self.mmode = 1
+        wx = 2. *  math.pi / self.grid.Lx
+        wy = 2. *  math.pi / self.grid.Ly
         self.initfield = np.zeros([self.grid.nx, self.grid.ny])
-        for m in range(1, self.nmode + 1):
-            for n in range(1, self.mmode + 1):
-                c10 = c1 / ((2. * n - 1.) * (2. * m - 1.))
-                c20 = c2 * (2. * n - 1.)
-                c30 = c3 * (2. * m - 1.)
-                for i in range(self.grid.nx):
-                    for j in range(self.grid.ny):
-                        x = self.grid.coordx[i][j]
-                        y = self.grid.coordy[i][j]
-                        add[i][j] = c10 * math.sin(c20 * x) \
-                                        * math.sin(c30 * y)
-                self.initfield += add
-                # print(m, n, self.grid.norm_h1(add))
-                # if self.grid.norm_h1(add) < 0.001:
-                #     break
+        for i in range(self.grid.nx):
+            for j in range(self.grid.ny):
+                x = self.grid.coordx[i][j]
+                y = self.grid.coordy[i][j]
+                self.initfield[i][j] = math.sin(wx * x) \
+                                     * math.sin(wy * y)
         gc_clean()
 
     def step(self):
         """
             Compute the analytical solution
         """
+        wt = 2. *  math.pi
         self.field = np.zeros([self.grid.nx, self.grid.ny])
         self.It += 1
         time = self.It * self.dt
-        c4 = math.pi * math.pi / (4. * self.grid.Ly**2)
-        c5 = math.pi * math.pi / (self.grid.Lx**2)
-        for m in range(1, self.nmode + 1):
-            for n in range(1, self.mmode + 1):
-                c40 = c4 * (2. * n - 1.)**2
-                c50 = c5 * (2. * m - 1.)**2
-                self.field = self.initfield * math.exp(-(c40 + c50) * time)
+        self.field = self.initfield * math.cos(time * wt)
 
 
 class Simulation(SkelSimulation):
@@ -118,11 +98,22 @@ class Simulation(SkelSimulation):
 
         # rhs and boundary conditions
         self.field = np.zeros([self.size])
-        self.calcbc(0)
+        self.calcbc(self.It,self.field)
         
         if self.isimplicit:
 #            self.Mat = np.linalg.inv(self.Mat)
             self.Mat = inv(self.Mat)
+            
+        indx = self.grid.indx
+        self.staticfield = np.zeros([self.size])
+        wx = 2. *  math.pi / self.grid.Lx
+        wy = 2. *  math.pi / self.grid.Ly
+        for i in range(self.grid.nx):
+            for j in range(self.grid.ny):
+                x = self.grid.coordx[i][j]
+                y = self.grid.coordy[i][j]
+                self.staticfield[indx(i, j)] =  math.sin(wx * x) * math.sin(wy * y)
+            
         gc_clean()
 
     def calcmat(self):
@@ -189,15 +180,12 @@ class Simulation(SkelSimulation):
 
         for i in range(nx):
             dirichlet(i, 0)
-            if self.isimplicit:
-                neumann(i, ny - 1, 'y')
-            else:
-                dirichlet(i, ny - 1)
+            dirichlet(i, ny - 1)
         for j in range(ny):
             dirichlet(0, j)
             dirichlet(nx - 1, j)
 
-    def calcbc(self,It):
+    def calcbc(self,It, field):
         """
             Impose boundary condition on the field
         :return:
@@ -214,7 +202,7 @@ class Simulation(SkelSimulation):
             :param val:
             :return:
             """
-            self.field[indx(_i, _j)] = val
+            field[indx(_i, _j)] = val
 
         def neumann(_i, _j, val, _dir):
             """
@@ -233,13 +221,13 @@ class Simulation(SkelSimulation):
             x = self.grid.coordx[_i][_j]
             y = self.grid.coordy[_i][_j]
             time = It * self.dt
-            self.field[indx(_i, _j)]  = c10 * math.sin(c20 * x) \
+            field[indx(_i, _j)]  = c10 * math.sin(c20 * x) \
                                        * math.sin(c30 * y) \
                                        * math.exp(-(c40 + c50) * time)
 
         for i in range(nx):
             dirichlet(i, 0, 0.)
-            neumann(i, ny - 1, 0., np.array([0, -1]))
+            dirichlet(i, ny - 1, 0.)
         for j in range(ny):
             dirichlet(0, j, 0.)
             dirichlet(nx - 1, j, 0.)
@@ -263,12 +251,25 @@ class Simulation(SkelSimulation):
             Increment through the next time step of the simulation.
         """
         power = 0.  # np.random.normal(self.power, self.noiselevel, self.rhs.shape)
-        self.rhs = np.zeros([self.size]) + power
-        if self.isimplicit:        
-            self.calcbc(self.It +1 )
-        SkelSimulation.step(self)
-        if not self.isimplicit:        
-            self.calcbc(self.It)
+        self.It += 1
+
+        indx = self.grid.indx
+        time = self.It * self.dt
+        wx = 2. *  math.pi / self.grid.Lx
+        wy = 2. *  math.pi / self.grid.Ly
+        wt = 2. *  math.pi
+        coef = ((wx ** 2 + wy ** 2) *  math.cos(wt * time)
+                -        wt         *  math.sin(wt * time))
+        self.rhs = np.zeros([self.size])
+        self.rhs = self.staticfield * coef
+        self.rhs *= self.dt
+        if self.isimplicit:
+            self.rhs += self.field         
+#            self.calcbc(self.It, self.rhs)
+            self.field = self.Mat.dot(self.rhs)
+        else:
+            self.field = self.Mat.dot(self.field) + self.rhs
+#            self.calcbc(self.It, self.field)
 
 
 class KalmanWrapper(SkelKalmanObservatorWrapper):
@@ -375,7 +376,7 @@ class Chaleur(EDP):
     
     nx = 20
     ny = 20
-    dt = 5e-2
+    dt = 5e-3
     nIt = 150
 
     def __init__(self):
@@ -397,7 +398,7 @@ class Chaleur(EDP):
         self.grid.coordy += self.grid.Ly / 2.
         
 #        self.dt = min([self.grid.dx**2, self.grid.dy**2]) / 4.
-        self.nIt = int(0.5/self.dt)
+        self.nIt = int(1./self.dt)
         self.simulation = Simulation(self.grid, 0., self.noise_sim, self.dt)
         self.kalsim = Simulation(self.grid, 0., self.noise_sim, self.dt)
 
@@ -416,8 +417,9 @@ class Chaleur(EDP):
         :param simu: the simulation to perform (filtered or not)
         :return: iteration number
         """
+        simu.err = 0.
         for i in EDP.compute(self, simu):
-            simu.err = self.norm(simu.getsol() - self.reality.getsol())
+            simu.err += self.norm(simu.getsol() - self.reality.getsol())
             yield i
 
     def norm(self, field):
@@ -515,7 +517,7 @@ class Chaleur(EDP):
         # Err_kal = self.grid.norm_inf(Sol_kal)
         # print("%8.2e | %8.2e | %8.2e | %8.2e" %
         #       (Norm_ref, Err_mes, Err_sim, Err_kal))
-        return Err_sim
+        return self.simulation.err/self.simulation.It
 
 def sim():
    Chaleur().run_test_case(True)
@@ -530,7 +532,7 @@ def compure_order():
 
     edp.nx = nx
     edp.ny = ny
-    edp.dt = dt/1000
+    edp.dt = dt/100
 
 
     order = 0.
@@ -555,8 +557,8 @@ def compure_order():
 
     print("spatial order : ", moy/3)
 
-    edp.nx = nx
-    edp.ny = ny
+    edp.nx = nx*2
+    edp.ny = ny*2
     edp.dt = dt
 
     order = 0.
@@ -565,7 +567,7 @@ def compure_order():
         if i>1:
           old_err = err
           old_dt = edp.dt
-          edp.dt = 0.9 * edp.dt
+          edp.dt = 0.8 * edp.dt
           edp.reinit()
 
 
